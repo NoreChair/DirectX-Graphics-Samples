@@ -17,6 +17,10 @@ public:
 private:
     void CreatePipeline();
     void CreateAsset();
+
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandleForRTV();
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandleForDSV();
+
     void LogAdapter(IDXGIFactory4* dxgiFactory);
     void LogDisplyOutput(IDXGIAdapter* adapter);
     void LogDisplyModes(IDXGIOutput* output, DXGI_FORMAT format);
@@ -40,6 +44,8 @@ private:
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     ComPtr<ID3D12Fence> m_fence;
     ComPtr<ID3D12Resource> m_renderTargets[s_frameCount];
+    ComPtr<ID3D12Resource> m_depthStencilBuffer;
     ComPtr<ID3D12DescriptorHeap> m_rtvDescriptorHeap;
+    ComPtr<ID3D12DescriptorHeap> m_dsvDescriptorHeap;
 };
 
