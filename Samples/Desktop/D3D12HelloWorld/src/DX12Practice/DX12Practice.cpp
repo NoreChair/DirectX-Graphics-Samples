@@ -11,11 +11,13 @@ DX12Practice::DX12Practice(UINT width, UINT height, std::wstring name) : DXSampl
 void DX12Practice::OnInit()
 {
     CreatePipeline();
+    CreateAsset();
 }
 
 
 void DX12Practice::OnUpdate()
 {
+
 }
 
 void DX12Practice::OnRender()
@@ -97,11 +99,17 @@ void DX12Practice::CreatePipeline()
 
 void DX12Practice::CreateAsset()
 {
-    m_commandList->Reset(m_commandAllocator.Get(), nullptr);
     m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     m_dsvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
     m_srvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+    CreateDescriptorHeap();
+    CreateRenderTargetView();
+    CreateDepthStencilView();
+}
+
+void DX12Practice::CreateDescriptorHeap()
+{
     // Create Descriptor Heap
     D3D12_DESCRIPTOR_HEAP_DESC rtvDesc;
     rtvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -116,7 +124,10 @@ void DX12Practice::CreateAsset()
     dsvDesc.NumDescriptors = 1;
     dsvDesc.NodeMask = 0;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvDesc, IID_PPV_ARGS(m_dsvDescriptorHeap.GetAddressOf())));
+}
 
+void DX12Practice::CreateRenderTargetView()
+{
     // Create Render Target View
     CD3DX12_CPU_DESCRIPTOR_HANDLE handle(m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
     for (int i = 0; i < s_frameCount; ++i)
@@ -125,8 +136,13 @@ void DX12Practice::CreateAsset()
         m_device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, handle);
         handle.Offset(1, m_rtvDescriptorSize);
     }
+}
 
+void DX12Practice::CreateDepthStencilView()
+{
     // Create Depth/Stencil buffer
+    m_commandList->Reset(m_commandAllocator.Get(), nullptr);
+
     D3D12_RESOURCE_DESC dsvResourceDesc = { };
     dsvResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     dsvResourceDesc.Alignment = 0;
@@ -140,10 +156,40 @@ void DX12Practice::CreateAsset()
     dsvResourceDesc.DepthOrArraySize = 1;
     dsvResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-
     m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE, &dsvResourceDesc, D3D12_RESOURCE_STATE_COMMON, &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_D24_UNORM_S8_UINT, 1.0f, 0), IID_PPV_ARGS(m_depthStencilBuffer.GetAddressOf()));
     m_device->CreateDepthStencilView(m_depthStencilBuffer.Get(), nullptr, GetCPUDescriptorHandleForDSV());
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_depthStencilBuffer.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+    m_commandList->Close();
+    ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(1, ppCommandLists);
+}
+
+void DX12Practice::CreateVertexIndexBuffer()
+{
+    D3D12_INPUT_ELEMENT_DESC elementDesc[] = {
+        {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
+    };
+    D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { &elementDesc[0],_countof(elementDesc) };
+
+}
+
+void DX12Practice::PopulateCommandList()
+{
+    ThrowIfFailed(m_commandAllocator->Reset());
+    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+
+    D3D12_VIEWPORT viewport;
+    viewport.TopLeftX = 0;
+    viewport.TopLeftY = 0;
+    viewport.Width = static_cast<float>(m_width);
+    viewport.Height = static_cast<float>(m_height);
+    viewport.MinDepth = 0;
+    viewport.MaxDepth = 1;
+    D3D12_RECT scissortRect = { 0,0,m_width,m_height };
+
+    m_commandList->RSSetViewports(1, &viewport);
+    m_commandList->RSSetScissorRects(1, &scissortRect);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE DX12Practice::GetCPUDescriptorHandleForRTV()
