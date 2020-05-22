@@ -65,6 +65,10 @@ private:
 
     // resource && descriptor && pipeline 
     ComPtr<ID3D12PipelineState> m_pipelineState;
+    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+    D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+    ComPtr<ID3D12Resource> m_vertexBuffer;
+    ComPtr<ID3D12Resource> m_indexBuffer;
     ComPtr<ID3D12Resource> m_renderTargets[s_frameCount];
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
     ComPtr<ID3D12DescriptorHeap> m_rtvDescriptorHeap;

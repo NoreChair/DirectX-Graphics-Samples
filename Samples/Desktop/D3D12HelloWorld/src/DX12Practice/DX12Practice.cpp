@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "DX12Practice.h"
+#include "D3DUtil.h"
 
 DX12Practice::DX12Practice(UINT width, UINT height, std::wstring name) : DXSample(width, height, name)
 {
@@ -106,6 +107,7 @@ void DX12Practice::CreateAsset()
     CreateDescriptorHeap();
     CreateRenderTargetView();
     CreateDepthStencilView();
+    CreateVertexIndexBuffer();
 }
 
 void DX12Practice::CreateDescriptorHeap()
@@ -141,8 +143,6 @@ void DX12Practice::CreateRenderTargetView()
 void DX12Practice::CreateDepthStencilView()
 {
     // Create Depth/Stencil buffer
-    m_commandList->Reset(m_commandAllocator.Get(), nullptr);
-
     D3D12_RESOURCE_DESC dsvResourceDesc = { };
     dsvResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     dsvResourceDesc.Alignment = 0;
@@ -155,6 +155,8 @@ void DX12Practice::CreateDepthStencilView()
     dsvResourceDesc.MipLevels = 1;
     dsvResourceDesc.DepthOrArraySize = 1;
     dsvResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    m_commandList->Reset(m_commandAllocator.Get(), nullptr);
 
     m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE, &dsvResourceDesc, D3D12_RESOURCE_STATE_COMMON, &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_D24_UNORM_S8_UINT, 1.0f, 0), IID_PPV_ARGS(m_depthStencilBuffer.GetAddressOf()));
     m_device->CreateDepthStencilView(m_depthStencilBuffer.Get(), nullptr, GetCPUDescriptorHandleForDSV());
@@ -172,12 +174,42 @@ void DX12Practice::CreateVertexIndexBuffer()
     };
     D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { &elementDesc[0],_countof(elementDesc) };
 
+    Vertex verties[] = {
+            { { 0.0f, 0.25f * m_aspectRatio, 0.0f } },
+            { { 0.25f, -0.25f * m_aspectRatio, 0.0f } },
+            { { -0.25f, -0.25f * m_aspectRatio, 0.0f } }
+    };
+    UINT16 indices[] = {
+        0,1,2
+    };
+
+    m_commandList->Reset(m_commandAllocator.Get(), nullptr);
+
+    UINT vertiesSize = sizeof(verties);
+    ComPtr<ID3D12Resource> vbUploadBuffer;
+    m_vertexBuffer = D3DUtil::CreateDefaultBuffer(m_device.Get(), m_commandList.Get(), (void*)(&verties[0]), vertiesSize, vbUploadBuffer);
+    /*m_indexBuffer = D3DUtil::CreateDefaultBuffer(m_device.Get(), m_commandList.Get(), (void*)&indices[0], );*/
+    m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+    m_vertexBufferView.SizeInBytes = vertiesSize;
+    m_vertexBufferView.StrideInBytes = sizeof(Vertex);
+
+
+
+    m_commandList->Close();
+    ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(1, ppCommandLists);
+
 }
 
 void DX12Practice::PopulateCommandList()
 {
     ThrowIfFailed(m_commandAllocator->Reset());
     ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetCPUDescriptorHandleForRTV();
+    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetCPUDescriptorHandleForDSV();
 
     D3D12_VIEWPORT viewport;
     viewport.TopLeftX = 0;
@@ -186,10 +218,15 @@ void DX12Practice::PopulateCommandList()
     viewport.Height = static_cast<float>(m_height);
     viewport.MinDepth = 0;
     viewport.MaxDepth = 1;
-    D3D12_RECT scissortRect = { 0,0,m_width,m_height };
+    D3D12_RECT scissortRect = { 0,0,(long)m_width,(long)m_height };
 
+    m_commandList->OMSetRenderTargets(1, &rtvHandle, false, &dsvHandle);
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissortRect);
+    m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->DrawInstanced(3, 0, 0, 0);
+
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE DX12Practice::GetCPUDescriptorHandleForRTV()
