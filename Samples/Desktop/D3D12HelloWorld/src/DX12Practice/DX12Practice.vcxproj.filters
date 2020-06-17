@@ -32,6 +32,12 @@
     <ClInclude Include="d3dx12.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="D3DUtil.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshGeometry.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -49,5 +55,14 @@
     <ClCompile Include="Win32Application.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="D3DUtil.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshGeometry.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Assets\SimpleUnlit.hlsl" />
   </ItemGroup>
 </Project>

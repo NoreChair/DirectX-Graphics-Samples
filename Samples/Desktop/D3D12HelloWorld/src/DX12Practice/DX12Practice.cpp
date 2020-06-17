@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "DX12Practice.h"
 #include "D3DUtil.h"
+#include <DirectXPackedVector.h>
 
 DX12Practice::DX12Practice(UINT width, UINT height, std::wstring name) : DXSample(width, height, name)
 {
@@ -13,6 +14,19 @@ void DX12Practice::OnInit()
 {
     CreatePipeline();
     CreateAsset();
+
+    // wait for GPU resource complete upload
+    const UINT64 curFenceValue = m_fenceValue;
+    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), curFenceValue));
+    ++m_fenceValue;
+    if (m_fence->GetCompletedValue() < curFenceValue) {
+        m_fence->SetEventOnCompletion(curFenceValue, m_fenceEvent);
+        WaitForSingleObject(m_fenceEvent, INFINITE);
+    }
+
+    // release uploader resource
+    m_vbUploadBuffer->Release();
+    m_ibUploadBuffer->Release();
 }
 
 
@@ -23,6 +37,11 @@ void DX12Practice::OnUpdate()
 
 void DX12Practice::OnRender()
 {
+    PopulateCommandList();
+    ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    ThrowIfFailed(m_swapChain->Present(1, 0));
+    WaitForPreviousFrame();
 }
 
 void DX12Practice::OnDestroy()
@@ -118,20 +137,20 @@ void DX12Practice::CreateDescriptorHeap()
     rtvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     rtvDesc.NumDescriptors = s_frameCount;
     rtvDesc.NodeMask = 0;
-    ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvDesc, IID_PPV_ARGS(m_rtvDescriptorHeap.GetAddressOf())));
+    ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvDesc, IID_PPV_ARGS(m_rtvHeap.GetAddressOf())));
 
     D3D12_DESCRIPTOR_HEAP_DESC dsvDesc;
     dsvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
     dsvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     dsvDesc.NumDescriptors = 1;
     dsvDesc.NodeMask = 0;
-    ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvDesc, IID_PPV_ARGS(m_dsvDescriptorHeap.GetAddressOf())));
+    ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvDesc, IID_PPV_ARGS(m_dsvHeap.GetAddressOf())));
 }
 
 void DX12Practice::CreateRenderTargetView()
 {
     // Create Render Target View
-    CD3DX12_CPU_DESCRIPTOR_HANDLE handle(m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+    CD3DX12_CPU_DESCRIPTOR_HANDLE handle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
     for (int i = 0; i < s_frameCount; ++i)
     {
         m_swapChain->GetBuffer(i, IID_PPV_ARGS(m_renderTargets[i].GetAddressOf()));
@@ -169,16 +188,12 @@ void DX12Practice::CreateDepthStencilView()
 
 void DX12Practice::CreateVertexIndexBuffer()
 {
-    D3D12_INPUT_ELEMENT_DESC elementDesc[] = {
-        {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
-    };
-    D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { &elementDesc[0],_countof(elementDesc) };
-
     Vertex verties[] = {
             { { 0.0f, 0.25f * m_aspectRatio, 0.0f } },
             { { 0.25f, -0.25f * m_aspectRatio, 0.0f } },
             { { -0.25f, -0.25f * m_aspectRatio, 0.0f } }
     };
+
     UINT16 indices[] = {
         0,1,2
     };
@@ -186,19 +201,97 @@ void DX12Practice::CreateVertexIndexBuffer()
     m_commandList->Reset(m_commandAllocator.Get(), nullptr);
 
     UINT vertiesSize = sizeof(verties);
-    ComPtr<ID3D12Resource> vbUploadBuffer;
-    m_vertexBuffer = D3DUtil::CreateDefaultBuffer(m_device.Get(), m_commandList.Get(), (void*)(&verties[0]), vertiesSize, vbUploadBuffer);
-    /*m_indexBuffer = D3DUtil::CreateDefaultBuffer(m_device.Get(), m_commandList.Get(), (void*)&indices[0], );*/
+    UINT indicesSize = sizeof(indices);
+
+    m_vertexBuffer = D3DUtil::CreateDefaultBuffer(m_device.Get(), m_commandList.Get(), (void*)(&verties[0]), vertiesSize, m_vbUploadBuffer);
+    m_indexBuffer = D3DUtil::CreateDefaultBuffer(m_device.Get(), m_commandList.Get(), (void*)&indices[0], indicesSize, m_ibUploadBuffer);
+
     m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
     m_vertexBufferView.SizeInBytes = vertiesSize;
     m_vertexBufferView.StrideInBytes = sizeof(Vertex);
-
-
+    m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+    m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
+    m_indexBufferView.SizeInBytes = indicesSize;
 
     m_commandList->Close();
     ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(1, ppCommandLists);
+}
 
+void DX12Practice::CreateRenderPipeline()
+{
+    DirectX::XMStoreFloat4x4(&m_cbuffer.worldViewProj, DirectX::XMMatrixIdentity());
+    UINT cbufferSize = D3DUtil::CalcCBufferSize(sizeof(DX12Practice::PreDrawCBuffer));
+    m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(cbufferSize), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_constBuffer.GetAddressOf()));
+
+    byte* pData = nullptr;
+    m_constBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+    memcpy(pData, &m_cbuffer, sizeof(PreDrawCBuffer));
+    m_constBuffer->Unmap(0, nullptr);
+
+    D3D12_DESCRIPTOR_HEAP_DESC cbHeapDesc = {
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+        1,
+        D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+        0
+    };
+    m_device->CreateDescriptorHeap(&cbHeapDesc, IID_PPV_ARGS(m_cbufferHeap.GetAddressOf()));
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbViewDesc = {
+        m_constBuffer->GetGPUVirtualAddress(),
+        D3DUtil::CalcCBufferSize(sizeof(PreDrawCBuffer))
+    };
+    m_device->CreateConstantBufferView(&cbViewDesc, m_cbufferHeap->GetCPUDescriptorHandleForHeapStart());
+
+    // root signature
+    CD3DX12_ROOT_PARAMETER slotRootParamter[1];
+    CD3DX12_DESCRIPTOR_RANGE cbvTable;
+    cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+    slotRootParamter[0].InitAsDescriptorTable(1, &cbvTable);
+    CD3DX12_ROOT_SIGNATURE_DESC signature_desc(1, slotRootParamter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+    ComPtr<ID3DBlob> serializedRootSig = nullptr;
+    ComPtr<ID3DBlob> errorBlob = nullptr;
+    HRESULT hr = D3D12SerializeRootSignature(&signature_desc, D3D_ROOT_SIGNATURE_VERSION_1, serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+    ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSig->GetBufferPointer(), serializedRootSig->GetBufferSize(), IID_PPV_ARGS(m_rootSignature.GetAddressOf())));
+
+    // compile shader
+    ComPtr<ID3DBlob> vsByteCode;
+    ComPtr<ID3DBlob> fsByteCode;
+    vsByteCode = D3DUtil::CompileShader(L"Assets\SimpleUnlit.hlsl", nullptr, "VS", "vs_5_0");
+    fsByteCode = D3DUtil::CompileShader(L"Assets\SimpleUnlit.hlsl", nullptr, "PS", "vs_5_0");
+
+    // rasterizer 
+    CD3DX12_RASTERIZER_DESC rsDesc(D3D12_DEFAULT);
+    rsDesc.FillMode = D3D12_FILL_MODE_SOLID;
+    rsDesc.CullMode = D3D12_CULL_MODE_BACK;
+    rsDesc.FrontCounterClockwise = false;
+
+    // input layout 
+    D3D12_INPUT_ELEMENT_DESC elementDesc[] = {
+    {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
+    };
+    D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { &elementDesc[0],_countof(elementDesc) };
+
+    // graphic pipeline object
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
+    pipelineStateDesc.pRootSignature = m_rootSignature.Get();
+    pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vsByteCode.Get());
+    pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(fsByteCode.Get());
+    pipelineStateDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    pipelineStateDesc.SampleMask = UINT_MAX;
+    pipelineStateDesc.RasterizerState = rsDesc;
+    pipelineStateDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    pipelineStateDesc.InputLayout = inputLayoutDesc;
+    pipelineStateDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
+    pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    pipelineStateDesc.NumRenderTargets = 1;
+    pipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    pipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    pipelineStateDesc.SampleDesc.Count = 1;
+    pipelineStateDesc.SampleDesc.Quality = 0;
+
+    m_device->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(m_pipelineState.GetAddressOf()));
 }
 
 void DX12Practice::PopulateCommandList()
@@ -220,22 +313,43 @@ void DX12Practice::PopulateCommandList()
     viewport.MaxDepth = 1;
     D3D12_RECT scissortRect = { 0,0,(long)m_width,(long)m_height };
 
+    ID3D12DescriptorHeap* ppHeaps[] = { m_cbufferHeap.Get() };
+
     m_commandList->OMSetRenderTargets(1, &rtvHandle, false, &dsvHandle);
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissortRect);
+    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    m_commandList->SetGraphicsRootDescriptorTable(0, ppHeaps[0]->GetGPUDescriptorHandleForHeapStart());
     m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+    m_commandList->IASetIndexBuffer(&m_indexBufferView);
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->DrawInstanced(3, 0, 0, 0);
+    m_commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
 
+}
+
+void DX12Practice::WaitForPreviousFrame()
+{
+    const UINT64 curFence = m_fenceValue;
+    // set synchronized signal
+    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), curFence));
+    m_fenceValue++;
+
+    if (m_fence->GetCompletedValue() < curFence) {
+        // if fence not completed last synchronized signal,then wait for completion
+        ThrowIfFailed(m_fence->SetEventOnCompletion(curFence, m_fenceEvent));
+        WaitForSingleObject(m_fenceEvent, INFINITE);
+    }
+    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE DX12Practice::GetCPUDescriptorHandleForRTV()
 {
-    return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE DX12Practice::GetCPUDescriptorHandleForDSV() {
-    return m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    return m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
 }
 
 void DX12Practice::LogAdapter(IDXGIFactory4* dxgiFactory)

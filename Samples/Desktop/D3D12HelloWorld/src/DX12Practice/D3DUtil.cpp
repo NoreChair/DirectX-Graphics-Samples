@@ -1,4 +1,7 @@
 #include "stdafx.h"
+#include <iostream>
+#include <fstream>
+#include <d3dcompiler.h>
 #include "D3DUtil.h"
 #include "DXSampleHelper.h"
 
@@ -20,4 +23,42 @@ ComPtr<ID3D12Resource> D3DUtil::CreateDefaultBuffer(ID3D12Device* pDevice, ID3D1
     pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(defaultBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
 
     return defaultBuffer;
+}
+
+ComPtr<ID3DBlob> D3DUtil::CompileShader(const std::wstring & fileName, const D3D_SHADER_MACRO * defines, const std::string & entryPoint, const std::string & target)
+{
+    UINT compileFlags = 0;
+#if defined(DEBUG) || defined(_DEBUG)
+    compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif // DEBUG
+
+    HRESULT hr = S_OK;
+    ComPtr<ID3DBlob> byteCode;
+    ComPtr<ID3DBlob> errors;
+    hr = D3DCompileFromFile(fileName.c_str(), defines, nullptr, entryPoint.c_str(), target.c_str(), compileFlags, 0, byteCode.GetAddressOf(), errors.GetAddressOf());
+
+    if (errors != nullptr) {
+        OutputDebugStringA((char*)errors->GetBufferPointer());
+        ThrowIfFailed(hr);
+    }
+    return byteCode;
+}
+
+ComPtr<ID3DBlob> D3DUtil::LoadShaderBinary(const std::wstring & fileName)
+{
+    ComPtr<ID3DBlob> byteCode;
+    std::ifstream stream(fileName, std::ios::binary);
+    ThrowIfFailed(stream.is_open());
+    stream.seekg(std::ios_base::end);
+    size_t size = stream.tellg();
+    stream.seekg(std::ios_base::beg);
+    D3DCreateBlob(size, &byteCode);
+    stream.read(reinterpret_cast<char*>(byteCode->GetBufferPointer()), size);
+    stream.close();
+    return byteCode;
+}
+
+UINT D3DUtil::CalcCBufferSize(UINT size)
+{
+    return (size + 255) & ~255;
 }
