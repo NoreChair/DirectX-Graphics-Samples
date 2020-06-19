@@ -25,8 +25,8 @@ void DX12Practice::OnInit()
     }
 
     // release uploader resource
-    m_vbUploadBuffer->Release();
-    m_ibUploadBuffer->Release();
+    m_vbUploadBuffer = nullptr;
+    m_ibUploadBuffer = nullptr;
 }
 
 
@@ -52,19 +52,19 @@ void DX12Practice::OnDestroy()
 void DX12Practice::CreatePipeline()
 {
     UINT flags = 0;
-#if _DEBUG
-    ComPtr<ID3D12Debug> debugController;
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
-        debugController->EnableDebugLayer();
-        flags |= DXGI_CREATE_FACTORY_DEBUG;
-    }
-#endif
+    //#if _DEBUG
+    //    ComPtr<ID3D12Debug> debugController;
+    //    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
+    //        debugController->EnableDebugLayer();
+    //        flags |= DXGI_CREATE_FACTORY_DEBUG;
+    //    }
+    //#endif
 
     ComPtr<IDXGIFactory4> dxgiFactory;
     ThrowIfFailed(CreateDXGIFactory2(flags, IID_PPV_ARGS(&dxgiFactory)));
 
 #if _DEBUG
-    LogAdapter(dxgiFactory.Get());
+    //LogAdapter(dxgiFactory.Get());
 #endif 
 
     GetHardwareAdapter(dxgiFactory.Get(), &m_adapter);
@@ -127,6 +127,7 @@ void DX12Practice::CreateAsset()
     CreateRenderTargetView();
     CreateDepthStencilView();
     CreateVertexIndexBuffer();
+    CreateRenderPipeline();
 }
 
 void DX12Practice::CreateDescriptorHeap()
@@ -221,6 +222,7 @@ void DX12Practice::CreateVertexIndexBuffer()
 void DX12Practice::CreateRenderPipeline()
 {
     DirectX::XMStoreFloat4x4(&m_cbuffer.worldViewProj, DirectX::XMMatrixIdentity());
+    m_cbuffer.color = { 0.0,1.0,1.0,1.0 };
     UINT cbufferSize = D3DUtil::CalcCBufferSize(sizeof(DX12Practice::PreDrawCBuffer));
     m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(cbufferSize), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_constBuffer.GetAddressOf()));
 
@@ -258,13 +260,13 @@ void DX12Practice::CreateRenderPipeline()
     // compile shader
     ComPtr<ID3DBlob> vsByteCode;
     ComPtr<ID3DBlob> fsByteCode;
-    vsByteCode = D3DUtil::CompileShader(L"Assets\SimpleUnlit.hlsl", nullptr, "VS", "vs_5_0");
-    fsByteCode = D3DUtil::CompileShader(L"Assets\SimpleUnlit.hlsl", nullptr, "PS", "vs_5_0");
+    vsByteCode = D3DUtil::CompileShader(L"Assets/SimpleUnlit.hlsl", nullptr, "VS", "vs_5_1");
+    fsByteCode = D3DUtil::CompileShader(L"Assets/SimpleUnlit.hlsl", nullptr, "PS", "ps_5_1");
 
     // rasterizer 
     CD3DX12_RASTERIZER_DESC rsDesc(D3D12_DEFAULT);
     rsDesc.FillMode = D3D12_FILL_MODE_SOLID;
-    rsDesc.CullMode = D3D12_CULL_MODE_BACK;
+    rsDesc.CullMode = D3D12_CULL_MODE_NONE;
     rsDesc.FrontCounterClockwise = false;
 
     // input layout 
@@ -309,13 +311,15 @@ void DX12Practice::PopulateCommandList()
     viewport.TopLeftY = 0;
     viewport.Width = static_cast<float>(m_width);
     viewport.Height = static_cast<float>(m_height);
-    viewport.MinDepth = 0;
-    viewport.MaxDepth = 1;
+    viewport.MinDepth = D3D12_MIN_DEPTH;
+    viewport.MaxDepth = D3D12_MAX_DEPTH;
     D3D12_RECT scissortRect = { 0,0,(long)m_width,(long)m_height };
 
     ID3D12DescriptorHeap* ppHeaps[] = { m_cbufferHeap.Get() };
-
+    XMFLOAT4 color = { 0.0,0.2,0.4,1.0 };
     m_commandList->OMSetRenderTargets(1, &rtvHandle, false, &dsvHandle);
+    m_commandList->ClearRenderTargetView(rtvHandle, &color.x, 0, nullptr);
+    m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, D3D12_MAX_DEPTH, 0, 0, nullptr);
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissortRect);
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
@@ -326,6 +330,9 @@ void DX12Practice::PopulateCommandList()
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
 
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+    m_commandList->Close();
 }
 
 void DX12Practice::WaitForPreviousFrame()

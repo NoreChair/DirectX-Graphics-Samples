@@ -15,6 +15,7 @@ class DX12Practice :public DXSample
     typedef struct PreDrawConstBuffer
     {
         DirectX::XMFLOAT4X4 worldViewProj;
+        DirectX::XMFLOAT4 color;
     }PreDrawCBuffer;
 
 public:
