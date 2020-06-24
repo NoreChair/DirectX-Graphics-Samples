@@ -29,6 +29,6 @@ typedef struct Texture
 
     void DisposeLoader() {
         m_rawData = nullptr;
-        m_textureGPU = nullptr;
+        m_textureUploader = nullptr;
     }
 }Texture;

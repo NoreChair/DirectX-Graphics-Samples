@@ -66,7 +66,7 @@ void DX12Practice::CreatePipeline()
     ThrowIfFailed(CreateDXGIFactory2(flags, IID_PPV_ARGS(&dxgiFactory)));
 
 #if _DEBUG
-    LogAdapter(dxgiFactory.Get());
+    //LogAdapter(dxgiFactory.Get());
 #endif
 
     GetHardwareAdapter(dxgiFactory.Get(), &m_adapter);
@@ -234,20 +234,20 @@ void DX12Practice::CreateTextureBuffer()
     m_texture.m_rawData.reset(GenTextureData(256, 256));
     ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 256, 256), D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(m_texture.m_textureGPU.GetAddressOf())));
 
-    /*  ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &CD3DX12_RESOURCE_DESC::Buffer(m_texture.m_width * m_texture.m_height * 4), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_texture.m_textureUploader.GetAddressOf())));
+    ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &CD3DX12_RESOURCE_DESC::Buffer(m_texture.m_width * m_texture.m_height * 4), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_texture.m_textureUploader.GetAddressOf())));
 
-      byte* pData = nullptr;
-      m_texture.m_textureUploader->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-      memcpy(pData, m_texture.m_rawData.get(), m_texture.m_width * m_texture.m_height * 4);
-      m_texture.m_textureUploader->Unmap(0, nullptr);
+    byte* pData = nullptr;
+    m_texture.m_textureUploader->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+    memcpy(pData, m_texture.m_rawData.get(), m_texture.m_width * m_texture.m_height * 4);
+    m_texture.m_textureUploader->Unmap(0, nullptr);
 
-      D3D12_SUBRESOURCE_DATA textureData = {};
-      textureData.pData = m_texture.m_rawData.get();
-      textureData.RowPitch = m_texture.m_width * 4;
-      textureData.SlicePitch = textureData.RowPitch * m_texture.m_height;
+    D3D12_SUBRESOURCE_DATA textureData = {};
+    textureData.pData = m_texture.m_rawData.get();
+    textureData.RowPitch = m_texture.m_width * 4;
+    textureData.SlicePitch = textureData.RowPitch * m_texture.m_height;
 
-      UpdateSubresources(m_commandList.Get(), m_texture.m_textureGPU.Get(), m_texture.m_textureUploader.Get(), 0, 0, 1, &textureData);*/
-      //m_commandList->CopyTextureRegion(&CD3DX12_TEXTURE_COPY_LOCATION(m_texture.m_textureGPU.Get(), 0), 0, 0, 0, &CD3DX12_TEXTURE_COPY_LOCATION(m_texture.m_textureUploader.Get(), D3D12_PLACED_SUBRESOURCE_FOOTPRINT{ 0, D3D12_SUBRESOURCE_FOOTPRINT() }), nullptr);
+    UpdateSubresources(m_commandList.Get(), m_texture.m_textureGPU.Get(), m_texture.m_textureUploader.Get(), 0, 0, 1, &textureData);
+
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_texture.m_textureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
     m_commandList->Close();
@@ -342,6 +342,7 @@ void DX12Practice::CreateRenderPipeline()
     CD3DX12_DESCRIPTOR_RANGE samplerTable;
     samplerTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0);
     slotRootParamter[2].InitAsDescriptorTable(1, &samplerTable, D3D12_SHADER_VISIBILITY_PIXEL);
+
     CD3DX12_ROOT_SIGNATURE_DESC signature_desc(paramCount, slotRootParamter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 #else
     CD3DX12_STATIC_SAMPLER_DESC staticSamplerDesc[1];
