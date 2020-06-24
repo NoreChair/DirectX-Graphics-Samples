@@ -1,6 +1,8 @@
 #pragma once
 
 #include "DXSample.h"
+#include "Texture.h"
+#include "Sampler.h"
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
@@ -10,6 +12,7 @@ class DX12Practice :public DXSample
     typedef struct Vertex
     {
         XMFLOAT3 position;
+        XMFLOAT2 uv;
     }Vertex;
 
     typedef struct PreDrawConstBuffer
@@ -30,12 +33,14 @@ private:
     void CreatePipeline();
     void CreateAsset();
 
-    void CreateDescriptorHeap();
+    void CreateRenderHeap();
     void CreateRenderTargetView();
     void CreateDepthStencilView();
     void CreateVertexIndexBuffer();
+    void CreateTextureBuffer();
     void CreateRenderPipeline();
 
+    byte* GenTextureData(UINT width, UINT height);
     void PopulateCommandList();
     void WaitForPreviousFrame();
 
@@ -54,11 +59,14 @@ private:
     UINT m_rtvDescriptorSize;
     UINT m_dsvDescriptorSize;
     UINT m_srvDescriptorSize;
+    UINT m_samplerDescriptorSize;
 
     UINT64 m_fenceValue;
     HANDLE m_fenceEvent;
 
     PreDrawCBuffer m_cbuffer;
+    Texture m_texture;
+    Sampler m_sampler;
 
     // base device
     ComPtr<IDXGIAdapter1> m_adapter;
@@ -84,7 +92,9 @@ private:
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
     ComPtr<ID3D12Resource> m_vbUploadBuffer;
     ComPtr<ID3D12Resource> m_ibUploadBuffer;
-    ComPtr<ID3D12DescriptorHeap> m_cbufferHeap;
+    ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_srvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     ComPtr<ID3D12RootSignature> m_rootSignature;
