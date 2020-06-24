@@ -70,5 +70,6 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Assets\SimpleUnlit.hlsl" />
+    <FxCompile Include="Assets\ComputeShader.hlsl" />
   </ItemGroup>
 </Project>

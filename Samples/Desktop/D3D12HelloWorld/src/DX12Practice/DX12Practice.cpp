@@ -392,7 +392,23 @@ void DX12Practice::CreateRenderPipeline()
     pipelineStateDesc.SampleDesc.Count = 1;
     pipelineStateDesc.SampleDesc.Quality = 0;
 
-    m_device->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(m_pipelineState.GetAddressOf()));
+    m_device->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(m_graphicState.GetAddressOf()));
+}
+
+void DX12Practice::CreateComputePipeline()
+{
+    CD3DX12_ROOT_PARAMETER param[1];
+    param[0].InitAsConstantBufferView(0);
+
+    CD3DX12_ROOT_SIGNATURE_DESC signature_desc(_countof(param), param);
+
+    ComPtr<ID3DBlob> serializedRootSig = nullptr;
+    ComPtr<ID3DBlob> errorBlob = nullptr;
+    HRESULT hr = D3D12SerializeRootSignature(&signature_desc, D3D_ROOT_SIGNATURE_VERSION_1, serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+    m_device->CreateRootSignature(0, nullptr, 0, IID_PPV_ARGS(m_computeSignature.GetAddressOf()));
+    D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
+
+    ThrowIfFailed(m_device->CreateComputePipelineState(&desc, IID_PPV_ARGS(m_computeState.GetAddressOf())));
 }
 
 byte* DX12Practice::GenTextureData(UINT width, UINT height)
@@ -433,7 +449,7 @@ byte* DX12Practice::GenTextureData(UINT width, UINT height)
 void DX12Practice::PopulateCommandList()
 {
     ThrowIfFailed(m_commandAllocator->Reset());
-    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_graphicState.Get()));
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 

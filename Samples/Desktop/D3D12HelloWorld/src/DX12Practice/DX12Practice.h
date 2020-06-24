@@ -39,6 +39,7 @@ private:
     void CreateVertexIndexBuffer();
     void CreateTextureBuffer();
     void CreateRenderPipeline();
+    void CreateComputePipeline();
 
     byte* GenTextureData(UINT width, UINT height);
     void PopulateCommandList();
@@ -73,7 +74,7 @@ private:
     ComPtr<ID3D12Device> m_device;
     ComPtr<IDXGISwapChain3> m_swapChain;
 
-    // command 
+    // command
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
@@ -81,8 +82,9 @@ private:
     // synchronization
     ComPtr<ID3D12Fence> m_fence;
 
-    // resource && descriptor && pipeline 
-    ComPtr<ID3D12PipelineState> m_pipelineState;
+    // resource && descriptor && pipeline
+    ComPtr<ID3D12PipelineState> m_graphicState;
+    ComPtr<ID3D12PipelineState> m_computeState;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
     ComPtr<ID3D12Resource> m_constBuffer;
@@ -98,5 +100,6 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     ComPtr<ID3D12RootSignature> m_rootSignature;
+    ComPtr<ID3D12RootSignature> m_computeSignature;
 };
 
