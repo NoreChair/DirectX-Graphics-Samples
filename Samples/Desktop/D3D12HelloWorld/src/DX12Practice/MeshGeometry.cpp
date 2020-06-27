@@ -1,8 +1,9 @@
 #include "stdafx.h"
 #include "MeshGeometry.h"
-#include <exception>
 #include <d3dcompiler.h>
 #include "d3dx12.h"
+#include <stdexcept>
+
 MeshGeometry::MeshGeometry(UINT vboByteSize, UINT iboByteSize, ComPtr<ID3D12Device> device)
 {
     MeshGeometry(vboByteSize, iboByteSize, 0, device);

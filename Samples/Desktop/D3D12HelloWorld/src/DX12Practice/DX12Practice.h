@@ -21,6 +21,13 @@ class DX12Practice :public DXSample
         DirectX::XMFLOAT4 color;
     }PreDrawCBuffer;
 
+    typedef struct GradientConstBuffer {
+        float time;
+        float rate;
+        int width;
+        int height;
+    }GradientCBuffer;
+
 public:
     DX12Practice(UINT width, UINT height, std::wstring name);
 
@@ -33,7 +40,7 @@ private:
     void CreatePipeline();
     void CreateAsset();
 
-    void CreateRenderHeap();
+    void CreateDescriptorHeap();
     void CreateRenderTargetView();
     void CreateDepthStencilView();
     void CreateVertexIndexBuffer();
@@ -65,7 +72,8 @@ private:
     UINT64 m_fenceValue;
     HANDLE m_fenceEvent;
 
-    PreDrawCBuffer m_cbuffer;
+    PreDrawCBuffer m_preDrawCB;
+    GradientCBuffer m_gradientCB;
     Texture m_texture;
     Sampler m_sampler;
 
@@ -87,18 +95,24 @@ private:
     ComPtr<ID3D12PipelineState> m_computeState;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
-    ComPtr<ID3D12Resource> m_constBuffer;
+
+    ComPtr<ID3D12Resource> m_vbUploadBuffer;
+    ComPtr<ID3D12Resource> m_ibUploadBuffer;
+
+    ComPtr<ID3D12Resource> m_computeCB;
+    ComPtr<ID3D12Resource> m_renderCB;
     ComPtr<ID3D12Resource> m_vertexBuffer;
     ComPtr<ID3D12Resource> m_indexBuffer;
     ComPtr<ID3D12Resource> m_renderTargets[s_frameCount];
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
-    ComPtr<ID3D12Resource> m_vbUploadBuffer;
-    ComPtr<ID3D12Resource> m_ibUploadBuffer;
+
+    ComPtr<ID3D12DescriptorHeap> m_uavHeap;
     ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
     ComPtr<ID3D12DescriptorHeap> m_srvHeap;
     ComPtr<ID3D12DescriptorHeap> m_samplerHeap;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
+
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12RootSignature> m_computeSignature;
 };

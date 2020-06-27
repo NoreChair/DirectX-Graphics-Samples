@@ -7,7 +7,7 @@
 #include "DX12Practice.h"
 #include "D3DUtil.h"
 
-DX12Practice::DX12Practice(UINT width, UINT height, std::wstring name) : DXSample(width, height, name)
+DX12Practice::DX12Practice(UINT width, UINT height, std::wstring name) : DXSample(width,height, name)
 {
 }
 
@@ -126,17 +126,18 @@ void DX12Practice::CreateAsset()
     m_srvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     m_samplerDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 
-    CreateRenderHeap();
+    CreateDescriptorHeap();
     CreateRenderTargetView();
     CreateDepthStencilView();
     CreateVertexIndexBuffer();
     CreateTextureBuffer();
     CreateRenderPipeline();
+    CreateComputePipeline();
 }
 
-void DX12Practice::CreateRenderHeap()
+void DX12Practice::CreateDescriptorHeap()
 {
-    // Create Descriptor Heap
+    // Create Render Descriptor Heap
     D3D12_DESCRIPTOR_HEAP_DESC rtvDesc;
     rtvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
     rtvDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
@@ -150,6 +151,38 @@ void DX12Practice::CreateRenderHeap()
     dsvDesc.NumDescriptors = 1;
     dsvDesc.NodeMask = 0;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvDesc, IID_PPV_ARGS(m_dsvHeap.GetAddressOf())));
+
+    D3D12_DESCRIPTOR_HEAP_DESC cbvDesc = {
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+        2,
+        D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+        0
+    };
+    m_device->CreateDescriptorHeap(&cbvDesc, IID_PPV_ARGS(m_cbvHeap.GetAddressOf()));
+
+    D3D12_DESCRIPTOR_HEAP_DESC uvaDesc{};
+    uvaDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    uvaDesc.NumDescriptors = 1;
+    uvaDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    uvaDesc.NodeMask = 0;
+    ThrowIfFailed(m_device->CreateDescriptorHeap(&uvaDesc, IID_PPV_ARGS(m_uavHeap.GetAddressOf())));
+
+    D3D12_DESCRIPTOR_HEAP_DESC srvDesc{
+    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+    1,
+    D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+    0
+    };
+    ThrowIfFailed(m_device->CreateDescriptorHeap(&srvDesc, IID_PPV_ARGS(m_srvHeap.GetAddressOf())));
+
+    // create sampler descriptor heap
+    D3D12_DESCRIPTOR_HEAP_DESC samplerDesc{
+        D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+        1,
+        D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+        0
+    };
+    ThrowIfFailed(m_device->CreateDescriptorHeap(&samplerDesc, IID_PPV_ARGS(m_samplerHeap.GetAddressOf())));
 }
 
 void DX12Practice::CreateRenderTargetView()
@@ -232,7 +265,7 @@ void DX12Practice::CreateTextureBuffer()
     m_texture.m_height = 256;
     m_texture.m_name = "TestTexture";
     m_texture.m_rawData.reset(GenTextureData(256, 256));
-    ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 256, 256), D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(m_texture.m_textureGPU.GetAddressOf())));
+    ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 256, 256,1,0,1,0,D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS), D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(m_texture.m_textureGPU.GetAddressOf())));
 
     ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &CD3DX12_RESOURCE_DESC::Buffer(m_texture.m_width * m_texture.m_height * 4), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_texture.m_textureUploader.GetAddressOf())));
 
@@ -255,14 +288,6 @@ void DX12Practice::CreateTextureBuffer()
     m_commandQueue->ExecuteCommandLists(1, ppCommandLists);
 
     // create texture buffer view
-    D3D12_DESCRIPTOR_HEAP_DESC heapDesc{
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-        1,
-        D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
-        0
-    };
-    ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(m_srvHeap.GetAddressOf())));
-
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
     srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -276,10 +301,6 @@ void DX12Practice::CreateTextureBuffer()
     m_device->CreateShaderResourceView(m_texture.m_textureGPU.Get(), &srvDesc, m_texture.GetCPUHandle(m_srvDescriptorSize));
 
 #ifndef STATIC_SAMPLER
-    // create sampler descriptor heap
-    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
-    ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(m_samplerHeap.GetAddressOf())));
-
     D3D12_SAMPLER_DESC samplerDesc = {};
     samplerDesc.Filter = D3D12_FILTER_MAXIMUM_MIN_MAG_MIP_LINEAR;
     samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -299,26 +320,18 @@ void DX12Practice::CreateTextureBuffer()
 
 void DX12Practice::CreateRenderPipeline()
 {
-    DirectX::XMStoreFloat4x4(&m_cbuffer.worldViewProj, DirectX::XMMatrixIdentity());
-    m_cbuffer.color = { 0.0,1.0,1.0,1.0 };
+    DirectX::XMStoreFloat4x4(&m_preDrawCB.worldViewProj, DirectX::XMMatrixIdentity());
+    m_preDrawCB.color = { 0.0,1.0,1.0,1.0 };
     UINT cbufferSize = D3DUtil::CalcCBufferSize(sizeof(DX12Practice::PreDrawCBuffer));
-    m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(cbufferSize), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_constBuffer.GetAddressOf()));
+    m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(cbufferSize), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_renderCB.GetAddressOf()));
 
     byte* pData = nullptr;
-    m_constBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pData));
-    memcpy(pData, &m_cbuffer, sizeof(PreDrawCBuffer));
-    m_constBuffer->Unmap(0, nullptr);
-
-    D3D12_DESCRIPTOR_HEAP_DESC cbHeapDesc = {
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-        1,
-        D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
-        0
-    };
-    m_device->CreateDescriptorHeap(&cbHeapDesc, IID_PPV_ARGS(m_cbvHeap.GetAddressOf()));
+    m_renderCB->Map(0, nullptr, reinterpret_cast<void**>(&pData));
+    memcpy(pData, &m_preDrawCB, sizeof(PreDrawCBuffer));
+    m_renderCB->Unmap(0, nullptr);
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbViewDesc = {
-        m_constBuffer->GetGPUVirtualAddress(),
+        m_renderCB->GetGPUVirtualAddress(),
         D3DUtil::CalcCBufferSize(sizeof(PreDrawCBuffer))
     };
     m_device->CreateConstantBufferView(&cbViewDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
@@ -397,18 +410,44 @@ void DX12Practice::CreateRenderPipeline()
 
 void DX12Practice::CreateComputePipeline()
 {
-    CD3DX12_ROOT_PARAMETER param[1];
+    // Create compute root signature and pipeline
+    CD3DX12_ROOT_PARAMETER param[2];
     param[0].InitAsConstantBufferView(0);
-
+    param[1].InitAsDescriptorTable(1, &CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0));
     CD3DX12_ROOT_SIGNATURE_DESC signature_desc(_countof(param), param);
 
     ComPtr<ID3DBlob> serializedRootSig = nullptr;
     ComPtr<ID3DBlob> errorBlob = nullptr;
     HRESULT hr = D3D12SerializeRootSignature(&signature_desc, D3D_ROOT_SIGNATURE_VERSION_1, serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
-    m_device->CreateRootSignature(0, nullptr, 0, IID_PPV_ARGS(m_computeSignature.GetAddressOf()));
-    D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
+   ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSig->GetBufferPointer(), serializedRootSig->GetBufferSize(), IID_PPV_ARGS(m_computeSignature.GetAddressOf())));
 
+    auto csCode= D3DUtil::CompileShader(L"Assets/ComputeShader.hlsl", nullptr, "main", "cs_5_1");
+
+    D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
+    desc.pRootSignature = m_computeSignature.Get();
+    desc.CS = CD3DX12_SHADER_BYTECODE(csCode.Get());
     ThrowIfFailed(m_device->CreateComputePipelineState(&desc, IID_PPV_ARGS(m_computeState.GetAddressOf())));
+
+    // Create const buffer
+    ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(D3DUtil::CalcCBufferSize(sizeof(GradientCBuffer))), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_computeCB.GetAddressOf())));
+
+    m_gradientCB.time = 0.0f;
+    m_gradientCB.rate = 2.0f;
+    m_gradientCB.width = m_texture.m_width;
+    m_gradientCB.height = m_texture.m_height;
+
+    void* pData = nullptr;
+    ThrowIfFailed(m_computeCB->Map(0, nullptr, &pData));
+    memcpy(pData, &m_gradientCB, sizeof(GradientCBuffer));
+    m_computeCB->Unmap(0, nullptr);
+
+    // Create unordered access view
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+    uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    uavDesc.Texture2D.MipSlice = 0;
+    m_device->CreateUnorderedAccessView(m_texture.m_textureGPU.Get(), nullptr, &uavDesc, m_uavHeap->GetCPUDescriptorHandleForHeapStart());
+    
 }
 
 byte* DX12Practice::GenTextureData(UINT width, UINT height)
