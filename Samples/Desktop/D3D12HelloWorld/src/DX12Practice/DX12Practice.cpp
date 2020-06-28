@@ -7,7 +7,7 @@
 #include "DX12Practice.h"
 #include "D3DUtil.h"
 
-DX12Practice::DX12Practice(UINT width, UINT height, std::wstring name) : DXSample(width,height, name)
+DX12Practice::DX12Practice(UINT width, UINT height, std::wstring name) : DXSample(width, height, name)
 {
 }
 
@@ -34,12 +34,15 @@ void DX12Practice::OnInit()
 
 void DX12Practice::OnUpdate()
 {
-
+    ThrowIfFailed(m_commandAllocator->Reset());
+    PopulateComputeCommand();
+    ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 }
 
 void DX12Practice::OnRender()
 {
-    PopulateCommandList();
+    PopulateRenderCommand();
     ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
     ThrowIfFailed(m_swapChain->Present(1, 0));
@@ -265,7 +268,7 @@ void DX12Practice::CreateTextureBuffer()
     m_texture.m_height = 256;
     m_texture.m_name = "TestTexture";
     m_texture.m_rawData.reset(GenTextureData(256, 256));
-    ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 256, 256,1,0,1,0,D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS), D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(m_texture.m_textureGPU.GetAddressOf())));
+    ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 256, 256, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS), D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(m_texture.m_textureGPU.GetAddressOf())));
 
     ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &CD3DX12_RESOURCE_DESC::Buffer(m_texture.m_width * m_texture.m_height * 4), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_texture.m_textureUploader.GetAddressOf())));
 
@@ -419,9 +422,9 @@ void DX12Practice::CreateComputePipeline()
     ComPtr<ID3DBlob> serializedRootSig = nullptr;
     ComPtr<ID3DBlob> errorBlob = nullptr;
     HRESULT hr = D3D12SerializeRootSignature(&signature_desc, D3D_ROOT_SIGNATURE_VERSION_1, serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
-   ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSig->GetBufferPointer(), serializedRootSig->GetBufferSize(), IID_PPV_ARGS(m_computeSignature.GetAddressOf())));
+    ThrowIfFailed(m_device->CreateRootSignature(0, serializedRootSig->GetBufferPointer(), serializedRootSig->GetBufferSize(), IID_PPV_ARGS(m_computeSignature.GetAddressOf())));
 
-    auto csCode= D3DUtil::CompileShader(L"Assets/ComputeShader.hlsl", nullptr, "main", "cs_5_1");
+    auto csCode = D3DUtil::CompileShader(L"Assets/ComputeShader.hlsl", nullptr, "main", "cs_5_1");
 
     D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
     desc.pRootSignature = m_computeSignature.Get();
@@ -432,7 +435,7 @@ void DX12Practice::CreateComputePipeline()
     ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(D3DUtil::CalcCBufferSize(sizeof(GradientCBuffer))), D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(m_computeCB.GetAddressOf())));
 
     m_gradientCB.time = 0.0f;
-    m_gradientCB.rate = 2.0f;
+    m_gradientCB.rate = 5.0f;
     m_gradientCB.width = m_texture.m_width;
     m_gradientCB.height = m_texture.m_height;
 
@@ -447,7 +450,6 @@ void DX12Practice::CreateComputePipeline()
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
     uavDesc.Texture2D.MipSlice = 0;
     m_device->CreateUnorderedAccessView(m_texture.m_textureGPU.Get(), nullptr, &uavDesc, m_uavHeap->GetCPUDescriptorHandleForHeapStart());
-    
 }
 
 byte* DX12Practice::GenTextureData(UINT width, UINT height)
@@ -485,11 +487,9 @@ byte* DX12Practice::GenTextureData(UINT width, UINT height)
     return data;
 }
 
-void DX12Practice::PopulateCommandList()
+void DX12Practice::PopulateRenderCommand()
 {
-    ThrowIfFailed(m_commandAllocator->Reset());
     ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_graphicState.Get()));
-
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetCPUDescriptorHandleForRTV();
@@ -534,6 +534,29 @@ void DX12Practice::PopulateCommandList()
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
+    m_commandList->Close();
+}
+
+void DX12Practice::PopulateComputeCommand()
+{
+    m_commandList->Reset(m_commandAllocator.Get(), m_computeState.Get());
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_texture.m_textureGPU.Get(),
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+    m_gradientCB.time += 0.0166f;
+    void* pData = nullptr;
+    ThrowIfFailed(m_computeCB->Map(0, nullptr, &pData));
+    memcpy(pData, &m_gradientCB, sizeof(GradientCBuffer));
+    m_computeCB->Unmap(0, nullptr);
+    m_commandList->SetPipelineState(m_computeState.Get());
+    m_commandList->SetComputeRootSignature(m_computeSignature.Get());
+    m_commandList->SetComputeRootConstantBufferView(0, m_computeCB->GetGPUVirtualAddress());
+    ID3D12DescriptorHeap* uavHeaps[] = { m_uavHeap.Get() };
+    m_commandList->SetDescriptorHeaps(1, uavHeaps);
+    m_commandList->SetComputeRootDescriptorTable(1, m_uavHeap->GetGPUDescriptorHandleForHeapStart());
+    m_commandList->Dispatch((UINT)ceilf(m_texture.m_width / 16), (UINT)ceilf(m_texture.m_height / 16), 1);
+
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_texture.m_textureGPU.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
     m_commandList->Close();
 }
 

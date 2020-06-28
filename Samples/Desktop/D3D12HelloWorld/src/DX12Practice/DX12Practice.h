@@ -49,7 +49,8 @@ private:
     void CreateComputePipeline();
 
     byte* GenTextureData(UINT width, UINT height);
-    void PopulateCommandList();
+    void PopulateRenderCommand();
+    void PopulateComputeCommand();
     void WaitForPreviousFrame();
 
     D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandleForRTV();
