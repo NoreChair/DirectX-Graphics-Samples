@@ -279,7 +279,7 @@ void DeviceResources::CreateWindowSizeDependentResources()
             // If the device was removed for any reason, a new device and swap chain will need to be created.
             HandleDeviceLost();
 
-            // Everything is set up now. Do not continue execution of this method. HandleDeviceLost will reenter this method 
+            // Everything is set up now. Do not continue execution of this method. HandleDeviceLost will reenter this method
             // and correctly set up the new device.
             return;
         }
@@ -299,31 +299,28 @@ void DeviceResources::CreateWindowSizeDependentResources()
         swapChainDesc.BufferCount = m_backBufferCount;
         swapChainDesc.SampleDesc.Count = 1;
         swapChainDesc.SampleDesc.Quality = 0;
-        swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+        swapChainDesc.Scaling = DXGI_SCALING_NONE;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
         swapChainDesc.Flags = (m_options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
-        DXGI_SWAP_CHAIN_FULLSCREEN_DESC fsSwapChainDesc = { 0 };
-        fsSwapChainDesc.Windowed = TRUE;
-
         // Create a swap chain for the window.
         ComPtr<IDXGISwapChain1> swapChain;
-        
+
         // DXGI does not allow creating a swapchain targeting a window which has fullscreen styles(no border + topmost).
         // Temporarily remove the topmost property for creating the swapchain.
-        bool prevIsFullscreen = Win32Application::IsFullscreen();
-        if (prevIsFullscreen)
-        {
-            Win32Application::SetWindowZorderToTopMost(false);
-        }
-        
-        ThrowIfFailed(m_dxgiFactory->CreateSwapChainForHwnd(m_commandQueue.Get(), m_window, &swapChainDesc, &fsSwapChainDesc, nullptr, &swapChain));
-        
-        if (prevIsFullscreen)
-        {
-            Win32Application::SetWindowZorderToTopMost(true);
-        }
+        //bool prevIsFullscreen = Win32Application::IsFullscreen();
+        //if (prevIsFullscreen)
+        //{
+        //    Win32Application::SetWindowZorderToTopMost(false);
+        //}
+
+        ThrowIfFailed(m_dxgiFactory->CreateSwapChainForHwnd(m_commandQueue.Get(), m_window, &swapChainDesc, nullptr, nullptr, &swapChain));
+
+        //if (prevIsFullscreen)
+        //{
+        //    Win32Application::SetWindowZorderToTopMost(true);
+        //}
 
         ThrowIfFailed(swapChain.As(&m_swapChain));
 
@@ -551,7 +548,7 @@ void DeviceResources::Present(D3D12_RESOURCE_STATES beforeState)
 void DeviceResources::ExecuteCommandList()
 {
     ThrowIfFailed(m_commandList->Close());
-    ID3D12CommandList *commandLists[] = { m_commandList.Get() }; 
+    ID3D12CommandList *commandLists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(ARRAYSIZE(commandLists), commandLists);
 }
 
@@ -658,6 +655,6 @@ void DeviceResources::InitializeAdapter(IDXGIAdapter1** ppAdapter)
             throw exception("Unavailable adapter.");
         }
     }
-    
+
     *ppAdapter = adapter.Detach();
 }

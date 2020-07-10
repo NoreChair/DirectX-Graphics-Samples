@@ -45,6 +45,9 @@
     <ClInclude Include="Code\Head\d3dx12.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Code\Head\RayPayload.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Code\Src\DeviceResources.cpp">

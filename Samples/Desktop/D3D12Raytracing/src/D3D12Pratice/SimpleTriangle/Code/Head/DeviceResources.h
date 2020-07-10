@@ -90,7 +90,7 @@ namespace DX
         ID3D12CommandAllocator*     GetCommandAllocator() const { return m_commandAllocators[m_backBufferIndex].Get(); }
         ID3D12GraphicsCommandList*  GetCommandList() const { return m_commandList.Get(); }
         ID3D12GraphicsCommandList*  ResetAndGetCommandList() {
-            m_commandList->Reset(m_commandAllocators->Get(), nullptr);
+            m_commandList->Reset(m_commandAllocators[m_backBufferIndex].Get(), nullptr);
             return m_commandList.Get();
         }
         DXGI_FORMAT                 GetBackBufferFormat() const { return m_backBufferFormat; }

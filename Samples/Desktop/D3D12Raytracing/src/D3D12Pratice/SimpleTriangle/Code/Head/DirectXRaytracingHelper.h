@@ -72,7 +72,7 @@ class ShaderTable : public GpuUploadBuffer
 
     ShaderTable() {}
 public:
-    ShaderTable(ID3D12Device* device, UINT numShaderRecords, UINT shaderRecordSize, LPCWSTR resourceName = nullptr)
+    ShaderTable(ID3D12Device* device, UINT numShaderRecords, UINT shaderRecordSize, LPCWSTR resourceName = L"")
         : m_name(resourceName)
     {
         m_shaderRecordSize = Align(shaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
