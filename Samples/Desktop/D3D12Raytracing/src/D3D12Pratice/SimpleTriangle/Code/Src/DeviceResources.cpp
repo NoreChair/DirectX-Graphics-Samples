@@ -593,8 +593,6 @@ void DeviceResources::MoveToNextFrame()
     const UINT64 currentFenceValue = m_fenceValues[m_backBufferIndex];
     ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), currentFenceValue));
 
-    // Update the back buffer index.
-    m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // If the next frame is not ready to be rendered yet, wait until it is ready.
     if (m_fence->GetCompletedValue() < m_fenceValues[m_backBufferIndex])
@@ -603,6 +601,8 @@ void DeviceResources::MoveToNextFrame()
         WaitForSingleObjectEx(m_fenceEvent.Get(), INFINITE, FALSE);
     }
 
+    // Update the back buffer index.
+    m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
     // Set the fence value for the next frame.
     m_fenceValues[m_backBufferIndex] = currentFenceValue + 1;
 }

@@ -19,7 +19,7 @@ void raygen()
     d = d * 2.00 - 1.0f;
 
     RayDesc ray;
-    ray.Origin = float4(d.x, -d.y, 10, 1);
+    ray.Origin = float4(d.x, d.y, 10, 1);
     ray.Direction = float3(0, 0, -1);
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
