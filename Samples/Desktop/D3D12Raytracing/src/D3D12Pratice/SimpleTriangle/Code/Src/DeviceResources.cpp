@@ -499,6 +499,19 @@ void DeviceResources::Prepare(D3D12_RESOURCE_STATES beforeState)
     }
 }
 
+void DX::DeviceResources::ClearRenderTarget()
+{
+    const float clearColor[4]{ 0,0,0,0 };
+    auto rtvHandle = m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    rtvHandle.ptr += m_backBufferIndex * m_rtvDescriptorSize;
+    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+}
+
+void DX::DeviceResources::ClearDepthStencil()
+{
+    m_commandList->ClearDepthStencilView(m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, D3D12_MAX_DEPTH, 0, 0, nullptr);
+}
+
 // Present the contents of the swap chain to the screen.
 void DeviceResources::Present(D3D12_RESOURCE_STATES beforeState)
 {

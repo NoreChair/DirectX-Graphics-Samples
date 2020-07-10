@@ -48,7 +48,7 @@ void SimpleTriangle::OnUpdate()
 void SimpleTriangle::OnRender()
 {
     m_deviceResources->Prepare();
-
+    m_deviceResources->ClearRenderTarget();
     D3D12_DISPATCH_RAYS_DESC desc = {};
     desc.RayGenerationShaderRecord.StartAddress = m_raygenShaderTable->GetGPUVirtualAddress();
     desc.RayGenerationShaderRecord.SizeInBytes = m_raygenShaderTable->GetDesc().Width;
@@ -63,7 +63,13 @@ void SimpleTriangle::OnRender()
     desc.Depth = 1;
 
     std::vector<ID3D12DescriptorHeap *> heaps = { m_uavHeap.Get() };
+    m_commandList->SetComputeRootSignature(m_globalDummySignature.Get());
     m_commandList->SetDescriptorHeaps(1, heaps.data());
+    auto baseHandle = m_uavHeap->GetGPUDescriptorHandleForHeapStart();
+    m_commandList->SetComputeRootDescriptorTable(0, baseHandle);
+    //baseHandle.ptr += m_csuSize;
+    //m_commandList->SetComputeRootDescriptorTable(1, baseHandle);
+    m_commandList->SetComputeRootShaderResourceView(1, m_topLevelAS.pResult->GetGPUVirtualAddress());
     m_commandList->SetPipelineState1(m_dxrPipeline.Get());
     m_commandList->DispatchRays(&desc);
 
@@ -117,9 +123,9 @@ void SimpleTriangle::CreateVertexIndexBuffer()
     auto commandList = m_deviceResources->ResetAndGetCommandList();
 
     Vertex vertices[] = {
-        {{0,-0.7f,0.0}},
-        {{-0.7f,0.7f,0.0}},
-        {{0.7f,0.7f,0.0}}
+        {{0,-0.7f,1.0}},
+        {{-0.7f,0.7f,1.0}},
+        {{0.7f,0.7f,1.0}}
     };
 
     Index indices[] = {
@@ -252,11 +258,11 @@ void SimpleTriangle::CreateRootSignature()
 {
     // ray gen
     {
-        CD3DX12_ROOT_PARAMETER param[2];
-        param[0].InitAsDescriptorTable(1, &CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0, 0));
-        param[1].InitAsDescriptorTable(1, &CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, 1));
+        //CD3DX12_ROOT_PARAMETER param[2];
+        //param[0].InitAsDescriptorTable(1, &CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0, 0));
+        //param[1].InitAsDescriptorTable(1, &CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, 1));
         CD3DX12_ROOT_SIGNATURE_DESC desc;
-        desc.Init(2, param);
+        desc.Init(0, nullptr);
         desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
         SerializeAndCreateRaytracingRootSignature(desc, m_dxrDevice.Get(), m_rayGenRootSignature);
         m_rayGenRootSignature->SetName(L"RayGenSignature");
@@ -282,8 +288,12 @@ void SimpleTriangle::CreateRootSignature()
 
     // global
     {
+        CD3DX12_ROOT_PARAMETER param[2];
+        param[0].InitAsDescriptorTable(1, &CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0, 0));
+        //param[1].InitAsDescriptorTable(1, &CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, 1));
+        param[1].InitAsShaderResourceView(0);
         CD3DX12_ROOT_SIGNATURE_DESC desc;
-        desc.Init(0, nullptr);
+        desc.Init(2, param);
         SerializeAndCreateRaytracingRootSignature(desc, m_dxrDevice.Get(), m_globalDummySignature);
         m_globalDummySignature->SetName(L"GlobalSignature");
     }
@@ -296,7 +306,7 @@ void SimpleTriangle::CreateRayTracingOutput()
     D3D12_DESCRIPTOR_HEAP_DESC desc{};
     desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    desc.NumDescriptors = 2;
+    desc.NumDescriptors = 1;
     m_dxrDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(m_uavHeap.GetAddressOf()));
 
     auto texDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
@@ -309,13 +319,13 @@ void SimpleTriangle::CreateRayTracingOutput()
     uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
     m_dxrDevice->CreateUnorderedAccessView(m_dxrOutput.Get(), nullptr, &uavDesc, handle);
 
-    handle.ptr += m_csuSize;
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.RaytracingAccelerationStructure.Location = m_topLevelAS.pResult->GetGPUVirtualAddress();
-    m_dxrDevice->CreateShaderResourceView(nullptr, &srvDesc, handle);
+    //handle.ptr += m_csuSize;
+    //D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+    //srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    //srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+    //srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    //srvDesc.RaytracingAccelerationStructure.Location = m_topLevelAS.pResult->GetGPUVirtualAddress();
+    //m_dxrDevice->CreateShaderResourceView(m_topLevelAS.pResult.Get(), &srvDesc, handle);
 }
 
 void SimpleTriangle::CreateShaderTables()
@@ -327,9 +337,9 @@ void SimpleTriangle::CreateShaderTables()
     // raygen shader table
     {
         void* raygenShaderIdentifier = properties->GetShaderIdentifier(c_rayGenShaderName.c_str());
-        ShaderTable raygenShaderTable(m_dxrDevice.Get(), 1, shaderIdentifierSize + 8); //shader identifier and heap pointer
-        auto ptr = reinterpret_cast<UINT64*>(m_uavHeap->GetCPUDescriptorHandleForHeapStart().ptr);
-        raygenShaderTable.push_back(ShaderRecord(raygenShaderIdentifier, shaderIdentifierSize, &ptr, 8));
+        ShaderTable raygenShaderTable(m_dxrDevice.Get(), 1, shaderIdentifierSize); //shader identifier and heap pointer
+        //auto ptr = reinterpret_cast<UINT64*>(m_uavHeap->GetCPUDescriptorHandleForHeapStart().ptr);
+        raygenShaderTable.push_back(ShaderRecord(raygenShaderIdentifier, shaderIdentifierSize));
         m_raygenShaderTable = raygenShaderTable.GetResource();
     }
 
