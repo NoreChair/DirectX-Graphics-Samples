@@ -53,24 +53,23 @@ using namespace GameCore;
 using namespace Math;
 using namespace Graphics;
 
-class ModelViewer : public GameCore::IGameApp
-{
+class ModelViewer : public GameCore::IGameApp {
 public:
 
-    ModelViewer( void ) {}
+    ModelViewer(void) {}
 
-    virtual void Startup( void ) override;
-    virtual void Cleanup( void ) override;
+    virtual void Startup(void) override;
+    virtual void Cleanup(void) override;
 
-    virtual void Update( float deltaT ) override;
-    virtual void RenderScene( void ) override;
+    virtual void Update(float deltaT) override;
+    virtual void RenderScene(void) override;
 
 private:
 
     void RenderLightShadows(GraphicsContext& gfxContext);
 
     enum eObjectFilter { kOpaque = 0x1, kCutout = 0x2, kTransparent = 0x4, kAll = 0xF, kNone = 0x0 };
-    void RenderObjects( GraphicsContext& Context, const Matrix4& ViewProjMat, eObjectFilter Filter = kAll );
+    void RenderObjects(GraphicsContext& Context, const Matrix4& ViewProjMat, eObjectFilter Filter = kAll);
     void CreateParticleEffects();
     Camera m_Camera;
     std::auto_ptr<CameraController> m_CameraController;
@@ -103,23 +102,22 @@ private:
     ShadowCamera m_SunShadow;
 };
 
-CREATE_APPLICATION( ModelViewer )
+//CREATE_APPLICATION(ModelViewer)
 
 ExpVar m_SunLightIntensity("Application/Lighting/Sun Light Intensity", 4.0f, 0.0f, 16.0f, 0.1f);
 ExpVar m_AmbientIntensity("Application/Lighting/Ambient Intensity", 0.1f, -16.0f, 16.0f, 0.1f);
-NumVar m_SunOrientation("Application/Lighting/Sun Orientation", -0.5f, -100.0f, 100.0f, 0.1f );
-NumVar m_SunInclination("Application/Lighting/Sun Inclination", 0.75f, 0.0f, 1.0f, 0.01f );
-NumVar ShadowDimX("Application/Lighting/Shadow Dim X", 5000, 1000, 10000, 100 );
-NumVar ShadowDimY("Application/Lighting/Shadow Dim Y", 3000, 1000, 10000, 100 );
-NumVar ShadowDimZ("Application/Lighting/Shadow Dim Z", 3000, 1000, 10000, 100 );
+NumVar m_SunOrientation("Application/Lighting/Sun Orientation", -0.5f, -100.0f, 100.0f, 0.1f);
+NumVar m_SunInclination("Application/Lighting/Sun Inclination", 0.75f, 0.0f, 1.0f, 0.01f);
+NumVar ShadowDimX("Application/Lighting/Shadow Dim X", 5000, 1000, 10000, 100);
+NumVar ShadowDimY("Application/Lighting/Shadow Dim Y", 3000, 1000, 10000, 100);
+NumVar ShadowDimZ("Application/Lighting/Shadow Dim Z", 3000, 1000, 10000, 100);
 
 BoolVar ShowWaveTileCounts("Application/Forward+/Show Wave Tile Counts", false);
 #ifdef _WAVE_OP
 BoolVar EnableWaveOps("Application/Forward+/Enable Wave Ops", true);
 #endif
 
-void ModelViewer::Startup( void )
-{
+void ModelViewer::Startup(void) {
     SamplerDesc DefaultSamplerDesc;
     DefaultSamplerDesc.MaxAnisotropy = 8;
 
@@ -179,18 +177,18 @@ void ModelViewer::Startup( void )
     m_ModelPSO.SetBlendState(BlendDisable);
     m_ModelPSO.SetDepthStencilState(DepthStateTestEqual);
     m_ModelPSO.SetRenderTargetFormats(1, &ColorFormat, DepthFormat);
-    m_ModelPSO.SetVertexShader( g_pModelViewerVS, sizeof(g_pModelViewerVS) );
-    m_ModelPSO.SetPixelShader( g_pModelViewerPS, sizeof(g_pModelViewerPS) );
+    m_ModelPSO.SetVertexShader(g_pModelViewerVS, sizeof(g_pModelViewerVS));
+    m_ModelPSO.SetPixelShader(g_pModelViewerPS, sizeof(g_pModelViewerPS));
     m_ModelPSO.Finalize();
 
 #ifdef _WAVE_OP
     m_DepthWaveOpsPSO = m_DepthPSO;
-    m_DepthWaveOpsPSO.SetVertexShader( g_pDepthViewerVS_SM6, sizeof(g_pDepthViewerVS_SM6) );
+    m_DepthWaveOpsPSO.SetVertexShader(g_pDepthViewerVS_SM6, sizeof(g_pDepthViewerVS_SM6));
     m_DepthWaveOpsPSO.Finalize();
 
     m_ModelWaveOpsPSO = m_ModelPSO;
-    m_ModelWaveOpsPSO.SetVertexShader( g_pModelViewerVS_SM6, sizeof(g_pModelViewerVS_SM6) );
-    m_ModelWaveOpsPSO.SetPixelShader( g_pModelViewerPS_SM6, sizeof(g_pModelViewerPS_SM6) );
+    m_ModelWaveOpsPSO.SetVertexShader(g_pModelViewerVS_SM6, sizeof(g_pModelViewerVS_SM6));
+    m_ModelWaveOpsPSO.SetPixelShader(g_pModelViewerPS_SM6, sizeof(g_pModelViewerPS_SM6));
     m_ModelWaveOpsPSO.Finalize();
 #endif
 
@@ -214,17 +212,13 @@ void ModelViewer::Startup( void )
 
     // The caller of this function can override which materials are considered cutouts
     m_pMaterialIsCutout.resize(m_Model.m_Header.materialCount);
-    for (uint32_t i = 0; i < m_Model.m_Header.materialCount; ++i)
-    {
+    for (uint32_t i = 0; i < m_Model.m_Header.materialCount; ++i) {
         const Model::Material& mat = m_Model.m_pMaterial[i];
         if (std::string(mat.texDiffusePath).find("thorn") != std::string::npos ||
             std::string(mat.texDiffusePath).find("plant") != std::string::npos ||
-            std::string(mat.texDiffusePath).find("chain") != std::string::npos)
-        {
+            std::string(mat.texDiffusePath).find("chain") != std::string::npos) {
             m_pMaterialIsCutout[i] = true;
-        }
-        else
-        {
+        } else {
             m_pMaterialIsCutout[i] = false;
         }
     }
@@ -233,8 +227,8 @@ void ModelViewer::Startup( void )
 
     float modelRadius = Length(m_Model.m_Header.boundingBox.max - m_Model.m_Header.boundingBox.min) * .5f;
     const Vector3 eye = (m_Model.m_Header.boundingBox.min + m_Model.m_Header.boundingBox.max) * .5f + Vector3(modelRadius * .5f, 0.0f, 0.0f);
-    m_Camera.SetEyeAtUp( eye, Vector3(kZero), Vector3(kYUnitVector) );
-    m_Camera.SetZRange( 1.0f, 10000.0f );
+    m_Camera.SetEyeAtUp(eye, Vector3(kZero), Vector3(kYUnitVector));
+    m_Camera.SetZRange(1.0f, 10000.0f);
     m_CameraController.reset(new CameraController(m_Camera, Vector3(kYUnitVector)));
 
     MotionBlur::Enable = true;
@@ -252,19 +246,16 @@ void ModelViewer::Startup( void )
     m_ExtraTextures[5] = Lighting::m_LightGridBitMask.GetSRV();
 }
 
-void ModelViewer::Cleanup( void )
-{
+void ModelViewer::Cleanup(void) {
     m_Model.Clear();
     Lighting::Shutdown();
 }
 
-namespace Graphics
-{
+namespace Graphics {
     extern EnumVar DebugZoom;
 }
 
-void ModelViewer::Update( float deltaT )
-{
+void ModelViewer::Update(float deltaT) {
     ScopedTimer _prof(L"Update State");
 
     if (GameInput::IsFirstPressed(GameInput::kLShoulder))
@@ -279,7 +270,7 @@ void ModelViewer::Update( float deltaT )
     float sintheta = sinf(m_SunOrientation);
     float cosphi = cosf(m_SunInclination * 3.14159f * 0.5f);
     float sinphi = sinf(m_SunInclination * 3.14159f * 0.5f);
-    m_SunDirection = Normalize(Vector3( costheta * cosphi, sinphi, sintheta * cosphi ));
+    m_SunDirection = Normalize(Vector3(costheta * cosphi, sinphi, sintheta * cosphi));
 
     // We use viewport offsets to jitter sample positions from frame to frame (for TAA.)
     // D3D has a design quirk with fractional offsets such that the implicit scissor
@@ -302,10 +293,8 @@ void ModelViewer::Update( float deltaT )
     m_MainScissor.bottom = (LONG)g_SceneColorBuffer.GetHeight();
 }
 
-void ModelViewer::RenderObjects( GraphicsContext& gfxContext, const Matrix4& ViewProjMat, eObjectFilter Filter )
-{
-    struct VSConstants
-    {
+void ModelViewer::RenderObjects(GraphicsContext& gfxContext, const Matrix4& ViewProjMat, eObjectFilter Filter) {
+    struct VSConstants {
         Matrix4 modelToProjection;
         Matrix4 modelToShadow;
         XMFLOAT3 viewerPos;
@@ -320,22 +309,20 @@ void ModelViewer::RenderObjects( GraphicsContext& gfxContext, const Matrix4& Vie
 
     uint32_t VertexStride = m_Model.m_VertexStride;
 
-    for (uint32_t meshIndex = 0; meshIndex < m_Model.m_Header.meshCount; meshIndex++)
-    {
+    for (uint32_t meshIndex = 0; meshIndex < m_Model.m_Header.meshCount; meshIndex++) {
         const Model::Mesh& mesh = m_Model.m_pMesh[meshIndex];
 
         uint32_t indexCount = mesh.indexCount;
         uint32_t startIndex = mesh.indexDataByteOffset / sizeof(uint16_t);
         uint32_t baseVertex = mesh.vertexDataByteOffset / VertexStride;
 
-        if (mesh.materialIndex != materialIdx)
-        {
-            if ( m_pMaterialIsCutout[mesh.materialIndex] && !(Filter & kCutout) ||
-                !m_pMaterialIsCutout[mesh.materialIndex] && !(Filter & kOpaque) )
+        if (mesh.materialIndex != materialIdx) {
+            if (m_pMaterialIsCutout[mesh.materialIndex] && !(Filter & kCutout) ||
+                !m_pMaterialIsCutout[mesh.materialIndex] && !(Filter & kOpaque))
                 continue;
 
             materialIdx = mesh.materialIndex;
-            gfxContext.SetDynamicDescriptors(2, 0, 6, m_Model.GetSRVs(materialIdx) );
+            gfxContext.SetDynamicDescriptors(2, 0, 6, m_Model.GetSRVs(materialIdx));
         }
 
         gfxContext.SetConstants(4, baseVertex, materialIdx);
@@ -344,8 +331,7 @@ void ModelViewer::RenderObjects( GraphicsContext& gfxContext, const Matrix4& Vie
     }
 }
 
-void ModelViewer::RenderLightShadows(GraphicsContext& gfxContext)
-{
+void ModelViewer::RenderLightShadows(GraphicsContext& gfxContext) {
     using namespace Lighting;
 
     ScopedTimer _prof(L"RenderLightShadows", gfxContext);
@@ -373,19 +359,14 @@ void ModelViewer::RenderLightShadows(GraphicsContext& gfxContext)
     ++LightIndex;
 }
 
-void ModelViewer::RenderScene( void )
-{
+void ModelViewer::RenderScene(void) {
     static bool s_ShowLightCounts = false;
-    if (ShowWaveTileCounts != s_ShowLightCounts)
-    {
+    if (ShowWaveTileCounts != s_ShowLightCounts) {
         static bool EnableHDR;
-        if (ShowWaveTileCounts)
-        {
+        if (ShowWaveTileCounts) {
             EnableHDR = PostEffects::EnableHDR;
             PostEffects::EnableHDR = false;
-        }
-        else
-        {
+        } else {
             PostEffects::EnableHDR = EnableHDR;
         }
         s_ShowLightCounts = ShowWaveTileCounts;
@@ -397,8 +378,7 @@ void ModelViewer::RenderScene( void )
 
     uint32_t FrameIndex = TemporalEffects::GetFrameIndexMod2();
 
-    __declspec(align(16)) struct
-    {
+    __declspec(align(16)) struct {
         Vector3 sunDirection;
         Vector3 sunLight;
         Vector3 ambientLight;
@@ -423,8 +403,7 @@ void ModelViewer::RenderScene( void )
     psConstants.FrameIndexMod2 = FrameIndex;
 
     // Set the default state for command lists
-    auto pfnSetupGraphicsState = [&](void)
-    {
+    auto pfnSetupGraphicsState = [&](void) {
         gfxContext.SetRootSignature(m_RootSig);
         gfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         gfxContext.SetIndexBuffer(m_Model.m_IndexBuffer.IndexBufferView());
@@ -446,19 +425,19 @@ void ModelViewer::RenderScene( void )
             gfxContext.ClearDepth(g_SceneDepthBuffer);
 
 #ifdef _WAVE_OP
-            gfxContext.SetPipelineState(EnableWaveOps ? m_DepthWaveOpsPSO : m_DepthPSO );
+            gfxContext.SetPipelineState(EnableWaveOps ? m_DepthWaveOpsPSO : m_DepthPSO);
 #else
             gfxContext.SetPipelineState(m_DepthPSO);
 #endif
             gfxContext.SetDepthStencilTarget(g_SceneDepthBuffer.GetDSV());
             gfxContext.SetViewportAndScissor(m_MainViewport, m_MainScissor);
-            RenderObjects(gfxContext, m_ViewProjMatrix, kOpaque );
+            RenderObjects(gfxContext, m_ViewProjMatrix, kOpaque);
         }
 
         {
             ScopedTimer _prof2(L"Cutout", gfxContext);
             gfxContext.SetPipelineState(m_CutoutDepthPSO);
-            RenderObjects(gfxContext, m_ViewProjMatrix, kCutout );
+            RenderObjects(gfxContext, m_ViewProjMatrix, kCutout);
         }
     }
 
@@ -466,8 +445,7 @@ void ModelViewer::RenderScene( void )
 
     Lighting::FillLightGrid(gfxContext, m_Camera);
 
-    if (!SSAO::DebugDraw)
-    {
+    if (!SSAO::DebugDraw) {
         ScopedTimer _prof(L"Main Render", gfxContext);
 
         gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
@@ -489,8 +467,7 @@ void ModelViewer::RenderScene( void )
             g_ShadowBuffer.EndRendering(gfxContext);
         }
 
-        if (SSAO::AsyncCompute)
-        {
+        if (SSAO::AsyncCompute) {
             gfxContext.Flush();
             pfnSetupGraphicsState();
 
@@ -506,7 +483,7 @@ void ModelViewer::RenderScene( void )
             gfxContext.SetDynamicDescriptors(3, 0, _countof(m_ExtraTextures), m_ExtraTextures);
             gfxContext.SetDynamicConstantBufferView(1, sizeof(psConstants), &psConstants);
 #ifdef _WAVE_OP
-            gfxContext.SetPipelineState(EnableWaveOps ? m_ModelWaveOpsPSO : m_ModelPSO );
+            gfxContext.SetPipelineState(EnableWaveOps ? m_ModelWaveOpsPSO : m_ModelPSO);
 #else
             gfxContext.SetPipelineState(ShowWaveTileCounts ? m_WaveTileCountPSO : m_ModelPSO);
 #endif
@@ -514,12 +491,11 @@ void ModelViewer::RenderScene( void )
             gfxContext.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
             gfxContext.SetViewportAndScissor(m_MainViewport, m_MainScissor);
 
-            RenderObjects( gfxContext, m_ViewProjMatrix, kOpaque );
+            RenderObjects(gfxContext, m_ViewProjMatrix, kOpaque);
 
-            if (!ShowWaveTileCounts)
-            {
+            if (!ShowWaveTileCounts) {
                 gfxContext.SetPipelineState(m_CutoutModelPSO);
-                RenderObjects( gfxContext, m_ViewProjMatrix, kCutout );
+                RenderObjects(gfxContext, m_ViewProjMatrix, kCutout);
             }
         }
 
@@ -532,7 +508,7 @@ void ModelViewer::RenderScene( void )
 
     TemporalEffects::ResolveImage(gfxContext);
 
-    ParticleEffects::Render(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer,  g_LinearDepth[FrameIndex]);
+    ParticleEffects::Render(gfxContext, m_Camera, g_SceneColorBuffer, g_SceneDepthBuffer, g_LinearDepth[FrameIndex]);
 
     // Until I work out how to couple these two, it's "either-or".
     if (DepthOfField::Enable)
@@ -543,8 +519,7 @@ void ModelViewer::RenderScene( void )
     gfxContext.Finish();
 }
 
-void ModelViewer::CreateParticleEffects()
-{
+void ModelViewer::CreateParticleEffects() {
     ParticleEffectProperties Effect = ParticleEffectProperties();
     Effect.MinStartColor = Effect.MaxStartColor = Effect.MinEndColor = Effect.MaxEndColor = Color(1.0f, 1.0f, 1.0f, 0.0f);
     Effect.TexturePath = L"sparkTex.dds";
@@ -561,7 +536,7 @@ void ModelViewer::CreateParticleEffects()
     Effect.EmitRate = 64.0f;
     Effect.Spread.x = 20.0f;
     Effect.Spread.y = 50.0f;
-    ParticleEffects::InstantiateEffect( Effect );
+    ParticleEffects::InstantiateEffect(Effect);
 
     ParticleEffectProperties Smoke = ParticleEffectProperties();
     Smoke.TexturePath = L"smoke.dds";
@@ -577,7 +552,7 @@ void ModelViewer::CreateParticleEffects()
     Smoke.Spread.x = 60.0f;
     Smoke.Spread.y = 70.0f;
     Smoke.Spread.z = 20.0f;
-    ParticleEffects::InstantiateEffect( Smoke );
+    ParticleEffects::InstantiateEffect(Smoke);
 
     ParticleEffectProperties Fire = ParticleEffectProperties();
     Fire.MinStartColor = Fire.MaxStartColor = Fire.MinEndColor = Fire.MaxEndColor = Color(8.0f, 8.0f, 8.0f, 0.0f);
@@ -585,7 +560,7 @@ void ModelViewer::CreateParticleEffects()
 
     Fire.TotalActiveLifetime = FLT_MAX;
     Fire.Size = Vector4(54.0f, 68.0f, 0.1f, 0.3f);
-    Fire.Velocity = Vector4 (10.0f, 30.0f, 50.0f, 50.0f);
+    Fire.Velocity = Vector4(10.0f, 30.0f, 50.0f, 50.0f);
     Fire.LifeMinMax = XMFLOAT2(1.0f, 3.0f);
     Fire.MassMinMax = XMFLOAT2(10.5f, 14.0f);
     Fire.EmitProperties.Gravity = XMFLOAT3(0.0f, 1.0f, 0.0f);
@@ -594,5 +569,5 @@ void ModelViewer::CreateParticleEffects()
     Fire.EmitRate = 64.0f;
     Fire.Spread.x = 1.0f;
     Fire.Spread.y = 60.0f;
-    ParticleEffects::InstantiateEffect( Fire );
+    ParticleEffects::InstantiateEffect(Fire);
 }

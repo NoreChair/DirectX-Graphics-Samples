@@ -27,15 +27,13 @@ using namespace std;
 static map< size_t, ComPtr<ID3D12PipelineState> > s_GraphicsPSOHashMap;
 static map< size_t, ComPtr<ID3D12PipelineState> > s_ComputePSOHashMap;
 
-void PSO::DestroyAll(void)
-{
+void PSO::DestroyAll(void) {
     s_GraphicsPSOHashMap.clear();
     s_ComputePSOHashMap.clear();
 }
 
 
-GraphicsPSO::GraphicsPSO()
-{
+GraphicsPSO::GraphicsPSO() {
     ZeroMemory(&m_PSODesc, sizeof(m_PSODesc));
     m_PSODesc.NodeMask = 1;
     m_PSODesc.SampleMask = 0xFFFFFFFFu;
@@ -43,44 +41,36 @@ GraphicsPSO::GraphicsPSO()
     m_PSODesc.InputLayout.NumElements = 0;
 }
 
-void GraphicsPSO::SetBlendState( const D3D12_BLEND_DESC& BlendDesc )
-{
+void GraphicsPSO::SetBlendState(const D3D12_BLEND_DESC& BlendDesc) {
     m_PSODesc.BlendState = BlendDesc;
 }
 
-void GraphicsPSO::SetRasterizerState( const D3D12_RASTERIZER_DESC& RasterizerDesc )
-{
+void GraphicsPSO::SetRasterizerState(const D3D12_RASTERIZER_DESC& RasterizerDesc) {
     m_PSODesc.RasterizerState = RasterizerDesc;
 }
 
-void GraphicsPSO::SetDepthStencilState( const D3D12_DEPTH_STENCIL_DESC& DepthStencilDesc )
-{
+void GraphicsPSO::SetDepthStencilState(const D3D12_DEPTH_STENCIL_DESC& DepthStencilDesc) {
     m_PSODesc.DepthStencilState = DepthStencilDesc;
 }
 
-void GraphicsPSO::SetSampleMask( UINT SampleMask )
-{
+void GraphicsPSO::SetSampleMask(UINT SampleMask) {
     m_PSODesc.SampleMask = SampleMask;
 }
 
-void GraphicsPSO::SetPrimitiveTopologyType( D3D12_PRIMITIVE_TOPOLOGY_TYPE TopologyType )
-{
+void GraphicsPSO::SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE TopologyType) {
     ASSERT(TopologyType != D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED, "Can't draw with undefined topology");
     m_PSODesc.PrimitiveTopologyType = TopologyType;
 }
 
-void GraphicsPSO::SetPrimitiveRestart( D3D12_INDEX_BUFFER_STRIP_CUT_VALUE IBProps )
-{
+void GraphicsPSO::SetPrimitiveRestart(D3D12_INDEX_BUFFER_STRIP_CUT_VALUE IBProps) {
     m_PSODesc.IBStripCutValue = IBProps;
 }
 
-void GraphicsPSO::SetRenderTargetFormat( DXGI_FORMAT RTVFormat, DXGI_FORMAT DSVFormat, UINT MsaaCount, UINT MsaaQuality )
-{
-    SetRenderTargetFormats(1, &RTVFormat, DSVFormat, MsaaCount, MsaaQuality );
+void GraphicsPSO::SetRenderTargetFormat(DXGI_FORMAT RTVFormat, DXGI_FORMAT DSVFormat, UINT MsaaCount, UINT MsaaQuality) {
+    SetRenderTargetFormats(1, &RTVFormat, DSVFormat, MsaaCount, MsaaQuality);
 }
 
-void GraphicsPSO::SetRenderTargetFormats( UINT NumRTVs, const DXGI_FORMAT* RTVFormats, DXGI_FORMAT DSVFormat, UINT MsaaCount, UINT MsaaQuality )
-{
+void GraphicsPSO::SetRenderTargetFormats(UINT NumRTVs, const DXGI_FORMAT* RTVFormats, DXGI_FORMAT DSVFormat, UINT MsaaCount, UINT MsaaQuality) {
     ASSERT(NumRTVs == 0 || RTVFormats != nullptr, "Null format array conflicts with non-zero length");
     for (UINT i = 0; i < NumRTVs; ++i)
         m_PSODesc.RTVFormats[i] = RTVFormats[i];
@@ -92,12 +82,10 @@ void GraphicsPSO::SetRenderTargetFormats( UINT NumRTVs, const DXGI_FORMAT* RTVFo
     m_PSODesc.SampleDesc.Quality = MsaaQuality;
 }
 
-void GraphicsPSO::SetInputLayout( UINT NumElements, const D3D12_INPUT_ELEMENT_DESC* pInputElementDescs )
-{
+void GraphicsPSO::SetInputLayout(UINT NumElements, const D3D12_INPUT_ELEMENT_DESC* pInputElementDescs) {
     m_PSODesc.InputLayout.NumElements = NumElements;
 
-    if (NumElements > 0)
-    {
+    if (NumElements > 0) {
         D3D12_INPUT_ELEMENT_DESC* NewElements = (D3D12_INPUT_ELEMENT_DESC*)malloc(sizeof(D3D12_INPUT_ELEMENT_DESC) * NumElements);
         memcpy(NewElements, pInputElementDescs, NumElements * sizeof(D3D12_INPUT_ELEMENT_DESC));
         m_InputLayouts.reset((const D3D12_INPUT_ELEMENT_DESC*)NewElements);
@@ -106,8 +94,7 @@ void GraphicsPSO::SetInputLayout( UINT NumElements, const D3D12_INPUT_ELEMENT_DE
         m_InputLayouts = nullptr;
 }
 
-void GraphicsPSO::Finalize()
-{
+void GraphicsPSO::Finalize() {
     // Make sure the root signature is finalized first
     m_PSODesc.pRootSignature = m_RootSignature->GetSignature();
     ASSERT(m_PSODesc.pRootSignature != nullptr);
@@ -125,8 +112,7 @@ void GraphicsPSO::Finalize()
         auto iter = s_GraphicsPSOHashMap.find(HashCode);
 
         // Reserve space so the next inquiry will find that someone got here first.
-        if (iter == s_GraphicsPSOHashMap.end())
-        {
+        if (iter == s_GraphicsPSOHashMap.end()) {
             firstCompile = true;
             PSORef = s_GraphicsPSOHashMap[HashCode].GetAddressOf();
         }
@@ -134,21 +120,18 @@ void GraphicsPSO::Finalize()
             PSORef = iter->second.GetAddressOf();
     }
 
-    if (firstCompile)
-    {
-        ASSERT_SUCCEEDED( g_Device->CreateGraphicsPipelineState(&m_PSODesc, MY_IID_PPV_ARGS(&m_PSO)) );
+    if (firstCompile) {
+        ASSERT_SUCCEEDED(g_Device->CreateGraphicsPipelineState(&m_PSODesc, MY_IID_PPV_ARGS(&m_PSO)));
         s_GraphicsPSOHashMap[HashCode].Attach(m_PSO);
     }
-    else
-    {
+    else {
         while (*PSORef == nullptr)
             this_thread::yield();
         m_PSO = *PSORef;
     }
 }
 
-void ComputePSO::Finalize()
-{
+void ComputePSO::Finalize() {
     // Make sure the root signature is finalized first
     m_PSODesc.pRootSignature = m_RootSignature->GetSignature();
     ASSERT(m_PSODesc.pRootSignature != nullptr);
@@ -163,8 +146,7 @@ void ComputePSO::Finalize()
         auto iter = s_ComputePSOHashMap.find(HashCode);
 
         // Reserve space so the next inquiry will find that someone got here first.
-        if (iter == s_ComputePSOHashMap.end())
-        {
+        if (iter == s_ComputePSOHashMap.end()) {
             firstCompile = true;
             PSORef = s_ComputePSOHashMap[HashCode].GetAddressOf();
         }
@@ -172,21 +154,18 @@ void ComputePSO::Finalize()
             PSORef = iter->second.GetAddressOf();
     }
 
-    if (firstCompile)
-    {
-        ASSERT_SUCCEEDED( g_Device->CreateComputePipelineState(&m_PSODesc, MY_IID_PPV_ARGS(&m_PSO)) );
+    if (firstCompile) {
+        ASSERT_SUCCEEDED(g_Device->CreateComputePipelineState(&m_PSODesc, MY_IID_PPV_ARGS(&m_PSO)));
         s_ComputePSOHashMap[HashCode].Attach(m_PSO);
     }
-    else
-    {
+    else {
         while (*PSORef == nullptr)
             this_thread::yield();
         m_PSO = *PSORef;
     }
 }
 
-ComputePSO::ComputePSO()
-{
+ComputePSO::ComputePSO() {
     ZeroMemory(&m_PSODesc, sizeof(m_PSODesc));
     m_PSODesc.NodeMask = 1;
 }

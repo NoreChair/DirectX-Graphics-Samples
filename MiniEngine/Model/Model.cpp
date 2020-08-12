@@ -18,40 +18,40 @@
 Model::Model()
     : m_pMesh(nullptr)
     , m_pMaterial(nullptr)
+    , m_pMaterialType(nullptr)
     , m_pVertexData(nullptr)
     , m_pIndexData(nullptr)
     , m_pVertexDataDepth(nullptr)
     , m_pIndexDataDepth(nullptr)
-    , m_SRVs(nullptr)
-{
+    , m_SRVs(nullptr) {
     Clear();
 }
 
-Model::~Model()
-{
+Model::~Model() {
     Clear();
 }
 
-void Model::Clear()
-{
+void Model::Clear() {
     m_VertexBuffer.Destroy();
     m_IndexBuffer.Destroy();
     m_VertexBufferDepth.Destroy();
     m_IndexBufferDepth.Destroy();
 
-    delete [] m_pMesh;
+    delete[] m_pMesh;
     m_pMesh = nullptr;
     m_Header.meshCount = 0;
 
-    delete [] m_pMaterial;
+    delete[] m_pMaterial;
     m_pMaterial = nullptr;
     m_Header.materialCount = 0;
 
-    delete [] m_pVertexData;
-    delete [] m_pIndexData;
-    delete [] m_pVertexDataDepth;
-    delete [] m_pIndexDataDepth;
+    delete[] m_pMaterialType;
+    delete[] m_pVertexData;
+    delete[] m_pIndexData;
+    delete[] m_pVertexDataDepth;
+    delete[] m_pIndexDataDepth;
 
+    m_pMaterialType = nullptr;
     m_pVertexData = nullptr;
     m_Header.vertexDataByteSize = 0;
     m_pIndexData = nullptr;
@@ -67,12 +67,10 @@ void Model::Clear()
 }
 
 // assuming at least 3 floats for position
-void Model::ComputeMeshBoundingBox(unsigned int meshIndex, BoundingBox &bbox) const
-{
+void Model::ComputeMeshBoundingBox(unsigned int meshIndex, BoundingBox &bbox) const {
     const Mesh *mesh = m_pMesh + meshIndex;
 
-    if (mesh->vertexCount > 0)
-    {
+    if (mesh->vertexCount > 0) {
         unsigned int vertexStride = mesh->vertexStride;
 
         const float *p = (float*)(m_pVertexData + mesh->vertexDataByteOffset + mesh->attrib[attrib_position].offset);
@@ -80,8 +78,7 @@ void Model::ComputeMeshBoundingBox(unsigned int meshIndex, BoundingBox &bbox) co
         bbox.min = Scalar(FLT_MAX);
         bbox.max = Scalar(-FLT_MAX);
 
-        while (p < pEnd)
-        {
+        while (p < pEnd) {
             Vector3 pos(*(p + 0), *(p + 1), *(p + 2));
 
             bbox.min = Min(bbox.min, pos);
@@ -90,38 +87,31 @@ void Model::ComputeMeshBoundingBox(unsigned int meshIndex, BoundingBox &bbox) co
             (*(uint8_t**)&p) += vertexStride;
         }
     }
-    else
-    {
+    else {
         bbox.min = Scalar(0.0f);
         bbox.max = Scalar(0.0f);
     }
 }
 
-void Model::ComputeGlobalBoundingBox(BoundingBox &bbox) const
-{
-    if (m_Header.meshCount > 0)
-    {
+void Model::ComputeGlobalBoundingBox(BoundingBox &bbox) const {
+    if (m_Header.meshCount > 0) {
         bbox.min = Scalar(FLT_MAX);
         bbox.max = Scalar(-FLT_MAX);
-        for (unsigned int meshIndex = 0; meshIndex < m_Header.meshCount; meshIndex++)
-        {
+        for (unsigned int meshIndex = 0; meshIndex < m_Header.meshCount; meshIndex++) {
             const Mesh *mesh = m_pMesh + meshIndex;
 
             bbox.min = Min(bbox.min, mesh->boundingBox.min);
             bbox.max = Max(bbox.max, mesh->boundingBox.max);
         }
     }
-    else
-    {
+    else {
         bbox.min = Scalar(0.0f);
         bbox.max = Scalar(0.0f);
     }
 }
 
-void Model::ComputeAllBoundingBoxes()
-{
-    for (unsigned int meshIndex = 0; meshIndex < m_Header.meshCount; meshIndex++)
-    {
+void Model::ComputeAllBoundingBoxes() {
+    for (unsigned int meshIndex = 0; meshIndex < m_Header.meshCount; meshIndex++) {
         Mesh *mesh = m_pMesh + meshIndex;
         ComputeMeshBoundingBox(meshIndex, mesh->boundingBox);
     }

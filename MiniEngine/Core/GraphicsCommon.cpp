@@ -8,7 +8,7 @@
 //
 // Developed by Minigraph
 //
-// Author:  James Stanard 
+// Author:  James Stanard
 //
 
 #include "pch.h"
@@ -17,8 +17,7 @@
 #include "CommandSignature.h"
 #include "BitonicSort.h"
 
-namespace Graphics
-{
+namespace Graphics {
     SamplerDesc SamplerLinearWrapDesc;
     SamplerDesc SamplerAnisoWrapDesc;
     SamplerDesc SamplerShadowDesc;
@@ -60,18 +59,18 @@ namespace Graphics
     D3D12_DEPTH_STENCIL_DESC DepthStateReadOnlyReversed;
     D3D12_DEPTH_STENCIL_DESC DepthStateTestEqual;
 
+    D3D12_INPUT_LAYOUT_DESC InputLayoutDefault;
+
     CommandSignature DispatchIndirectCommandSignature(1);
     CommandSignature DrawIndirectCommandSignature(1);
 }
 
-namespace BitonicSort
-{
+namespace BitonicSort {
     void Initialize(void);
     void Shutdown(void);
 }
 
-void Graphics::InitializeCommonState(void)
-{
+void Graphics::InitializeCommonState(void) {
     SamplerLinearWrapDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     SamplerLinearWrap = SamplerLinearWrapDesc.CreateDescriptor();
 
@@ -197,6 +196,18 @@ void Graphics::InitializeCommonState(void)
     alphaBlend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
     BlendTraditionalAdditive = alphaBlend;
 
+    D3D12_INPUT_ELEMENT_DESC vertElem[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "BITANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+    };
+
+    InputLayoutDefault.NumElements = 5;
+    InputLayoutDefault.pInputElementDescs = vertElem;
+
     DispatchIndirectCommandSignature[0].Dispatch();
     DispatchIndirectCommandSignature.Finalize();
 
@@ -206,10 +217,9 @@ void Graphics::InitializeCommonState(void)
     BitonicSort::Initialize();
 }
 
-void Graphics::DestroyCommonState(void)
-{
+void Graphics::DestroyCommonState(void) {
     DispatchIndirectCommandSignature.Destroy();
     DrawIndirectCommandSignature.Destroy();
-    
+
     BitonicSort::Shutdown();
 }

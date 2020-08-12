@@ -20,8 +20,7 @@
 
 using namespace Math;
 
-class Model
-{
+class Model {
 public:
 
     Model();
@@ -29,8 +28,7 @@ public:
 
     void Clear();
 
-    enum
-    {
+    enum {
         attrib_mask_0 = (1 << 0),
         attrib_mask_1 = (1 << 1),
         attrib_mask_2 = (1 << 2),
@@ -56,8 +54,7 @@ public:
         attrib_mask_bitangent = attrib_mask_4,
     };
 
-    enum
-    {
+    enum {
         attrib_0 = 0,
         attrib_1 = 1,
         attrib_2 = 2,
@@ -85,8 +82,7 @@ public:
         maxAttribs = 16
     };
 
-    enum
-    {
+    enum {
         attrib_format_none = 0,
         attrib_format_ubyte,
         attrib_format_byte,
@@ -97,14 +93,12 @@ public:
         attrib_formats
     };
 
-    struct BoundingBox
-    {
+    struct BoundingBox {
         Vector3 min;
         Vector3 max;
     };
 
-    struct Header
-    {
+    struct Header {
         uint32_t meshCount;
         uint32_t materialCount;
         uint32_t vertexDataByteSize;
@@ -114,15 +108,13 @@ public:
     };
     Header m_Header;
 
-    struct Attrib
-    {
+    struct Attrib {
         uint16_t offset; // byte offset from the start of the vertex
         uint16_t normalized; // if true, integer formats are interpreted as [-1, 1] or [0, 1]
         uint16_t components; // 1-4
         uint16_t format;
     };
-    struct Mesh
-    {
+    struct Mesh {
         BoundingBox boundingBox;
 
         unsigned int materialIndex;
@@ -144,8 +136,7 @@ public:
     };
     Mesh *m_pMesh;
 
-    struct Material
-    {
+    struct Material {
         Vector3 diffuse;
         Vector3 specular;
         Vector3 ambient;
@@ -155,8 +146,8 @@ public:
         float shininess; // specular exponent
         float specularStrength; // multiplier on top of specular color
 
-        enum {maxTexPath = 128};
-        enum {texCount = 6};
+        enum { maxTexPath = 128 };
+        enum { texCount = 6 };
         char texDiffusePath[maxTexPath];
         char texSpecularPath[maxTexPath];
         char texEmissivePath[maxTexPath];
@@ -164,10 +155,27 @@ public:
         char texLightmapPath[maxTexPath];
         char texReflectionPath[maxTexPath];
 
-        enum {maxMaterialName = 128};
+        enum { maxMaterialName = 128 };
         char name[maxMaterialName];
     };
     Material *m_pMaterial;
+
+    enum EMaterialType {
+        Opaque,
+        Cutout,
+        Transparent
+    };
+    EMaterialType* m_pMaterialType;
+
+    enum ETextureType {
+        Diffuse = 0,
+        Specular = 1,
+        Emissive = 2,
+        Normal = 3,
+        LightMap = 4,
+        Reflection = 5,
+        Count
+    };
 
     unsigned char *m_pVertexData;
     unsigned char *m_pIndexData;
@@ -182,19 +190,27 @@ public:
     ByteAddressBuffer m_IndexBufferDepth;
     uint32_t m_VertexStrideDepth;
 
-    virtual bool Load(const char* filename)
-    {
+    virtual bool Load(const char* filename) {
         return LoadH3D(filename);
     }
 
-    const BoundingBox& GetBoundingBox() const
-    {
+    const BoundingBox& GetBoundingBox() const {
         return m_Header.boundingBox;
     }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE* GetSRVs( uint32_t materialIdx ) const
-    {
+    D3D12_CPU_DESCRIPTOR_HANDLE* GetSRVs(uint32_t materialIdx) const {
         return m_SRVs + materialIdx * 6;
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSRV(uint32_t materialIdx, ETextureType textureType) const {
+        return *(m_SRVs + materialIdx * 6 + textureType);
+    }
+
+    void GetMeshDrawInfo(int meshIndex, int& indexCount, int& indexStartLocation, int& vertexStartLocation) const {
+        const auto& subMesh = this->m_pMesh[meshIndex];
+        indexCount = subMesh.indexCount;
+        indexStartLocation = subMesh.indexDataByteOffset / sizeof(uint16_t);
+        vertexStartLocation = subMesh.vertexDataByteOffset / this->m_VertexStride;
     }
 
 protected:

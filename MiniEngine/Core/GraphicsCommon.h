@@ -8,7 +8,7 @@
 //
 // Developed by Minigraph
 //
-// Author:  James Stanard 
+// Author:  James Stanard
 //
 
 #pragma once
@@ -16,8 +16,7 @@
 class SamplerDesc;
 class CommandSignature;
 
-namespace Graphics
-{
+namespace Graphics {
     extern SamplerDesc SamplerLinearWrapDesc;
     extern SamplerDesc SamplerAnisoWrapDesc;
     extern SamplerDesc SamplerShadowDesc;
@@ -61,6 +60,8 @@ namespace Graphics
 
     extern CommandSignature DispatchIndirectCommandSignature;
     extern CommandSignature DrawIndirectCommandSignature;
+
+    extern D3D12_INPUT_LAYOUT_DESC InputLayoutDefault; // vertex uv normal bitangent tangent
 
     void InitializeCommonState(void);
     void DestroyCommonState(void);
