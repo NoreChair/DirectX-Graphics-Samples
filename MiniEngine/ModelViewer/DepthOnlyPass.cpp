@@ -31,7 +31,7 @@ void DepthOnlyPass::Setup() {
     m_depthOnlyCutoutPSO.Finalize();
 }
 
-void DepthOnlyPass::Execute(const Math::Camera& camera, GraphicsContext * pContext) {
+void DepthOnlyPass::Execute(const Math::Camera& camera, GraphicsContext* pContext) {
     struct DepthOnlyConstants {
         Math::Matrix4 m_viewProjMatrix;
     };

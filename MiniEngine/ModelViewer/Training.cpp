@@ -55,11 +55,12 @@ void Training::Startup() {
 
     m_depthOnlyPass.reset(new DepthOnlyPass());
     m_depthOnlyPass->Setup();
-    m_depthOnlyPass->PushModelToDraw(&m_model);
+    m_depthOnlyPass->PushModelToDraw(&m_model); // TODO : remove
 }
 
 void Training::Cleanup() {
     m_cameraController.reset();
+    m_model.Clear();
 }
 
 void Training::Update(float deltaT) {
@@ -67,5 +68,12 @@ void Training::Update(float deltaT) {
 }
 
 void Training::RenderScene() {
+    GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Render");
 
+    gfxContext.ClearColor(Graphics::g_SceneColorBuffer);
+    gfxContext.ClearDepthAndStencil(Graphics::g_SceneDepthBuffer);
+
+    m_depthOnlyPass->Execute(m_mainCamera, &gfxContext);
+
+    gfxContext.Finish();
 }
