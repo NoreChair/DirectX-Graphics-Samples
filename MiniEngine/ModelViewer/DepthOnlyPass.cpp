@@ -6,32 +6,39 @@
 DepthOnlyPass::DepthOnlyPass() : m_depthOnlyRS(), m_depthOnlyPSO(), m_depthOnlyCutoutPSO() {}
 
 void DepthOnlyPass::Setup() {
-    m_depthOnlyRS.Reset(2, 1);
+    m_depthOnlyRS.Reset(3, 1);
+    //m_depthOnlyRS.InitStaticSampler(0, Graphics::SamplerLinearClampDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+    //m_depthOnlyRS[0].InitAsConstantBuffer(0, D3D12_SHADER_VISIBILITY_VERTEX);
+    //m_depthOnlyRS[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
     m_depthOnlyRS.InitStaticSampler(0, Graphics::SamplerLinearClampDesc, D3D12_SHADER_VISIBILITY_PIXEL);
     m_depthOnlyRS[0].InitAsConstantBuffer(0, D3D12_SHADER_VISIBILITY_VERTEX);
-    //m_depthOnlyRS[1].InitAsDescriptorTable(2, D3D12_SHADER_VISIBILITY_PIXEL);
-    //m_depthOnlyRS[1].SetTableRange(0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
-    //m_depthOnlyRS[1].SetTableRange(1, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 0, 1);
-    m_depthOnlyRS[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_depthOnlyRS[1].InitAsConstantBuffer(0, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_depthOnlyRS[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_depthOnlyRS.Finalize(L"DepthOnlyRS", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
     DXGI_FORMAT depthFormat = Graphics::g_SceneDepthBuffer.GetFormat();
+    DXGI_FORMAT renderFormat[] = { Graphics::g_SceneColorBuffer.GetFormat() };
     m_depthOnlyPSO.SetRootSignature(m_depthOnlyRS);
     m_depthOnlyPSO.SetRasterizerState(Graphics::RasterizerDefault);
-    m_depthOnlyPSO.SetBlendState(Graphics::BlendNoColorWrite);
+    //m_depthOnlyPSO.SetBlendState(Graphics::BlendNoColorWrite);
+    m_depthOnlyPSO.SetBlendState(Graphics::BlendDisable);
     m_depthOnlyPSO.SetDepthStencilState(Graphics::DepthStateReadWrite);
     m_depthOnlyPSO.SetInputLayout(Graphics::InputLayoutDefault.NumElements, Graphics::InputLayoutDefault.pInputElementDescs);
-    m_depthOnlyPSO.SetRenderTargetFormats(0, nullptr, depthFormat);
+    //m_depthOnlyPSO.SetRenderTargetFormats(0, nullptr, depthFormat);
+    m_depthOnlyPSO.SetRenderTargetFormats(1, renderFormat, depthFormat);
     m_depthOnlyPSO.SetVertexShader(g_pDepthViewerVS, sizeof(g_pDepthViewerVS));
+    m_depthOnlyPSO.SetPixelShader(g_pDepthViewerPS, sizeof(g_pDepthViewerPS));
     m_depthOnlyPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
     m_depthOnlyPSO.Finalize();
 
-    m_depthOnlyCutoutPSO = m_depthOnlyCutoutPSO;
-    m_depthOnlyPSO.SetRasterizerState(Graphics::RasterizerTwoSided);
-    m_depthOnlyCutoutPSO.SetPixelShader(g_pDepthViewerPS, sizeof(g_pDepthViewerPS));
-    m_depthOnlyCutoutPSO.Finalize();
+    //m_depthOnlyCutoutPSO = m_depthOnlyPSO;
+    //m_depthOnlyPSO.SetRasterizerState(Graphics::RasterizerTwoSided);
+    //m_depthOnlyCutoutPSO.SetPixelShader(g_pDepthViewerPS, sizeof(g_pDepthViewerPS));
+    //m_depthOnlyCutoutPSO.Finalize();
 }
 
 void DepthOnlyPass::Execute(const Math::Camera& camera, GraphicsContext* pContext) {
+
     struct DepthOnlyConstants {
         Math::Matrix4 m_viewProjMatrix;
     };
@@ -39,14 +46,16 @@ void DepthOnlyPass::Execute(const Math::Camera& camera, GraphicsContext* pContex
     DepthOnlyConstants constantBuffer;
     constantBuffer.m_viewProjMatrix = camera.GetViewProjMatrix();
 
+    //pContext->SetDepthStencilTarget(Graphics::g_SceneDepthBuffer.GetDSV());
+    pContext->SetRenderTarget(Graphics::g_SceneColorBuffer.GetRTV(), Graphics::g_SceneDepthBuffer.GetDSV());
     pContext->SetRootSignature(m_depthOnlyRS);
     pContext->SetPipelineState(m_depthOnlyPSO);
     pContext->SetDynamicConstantBufferView(0, sizeof(DepthOnlyConstants), &constantBuffer);
     pContext->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    DrawObjects(pContext, Model::EMaterialType::Cutout);
+    DrawObjects(pContext, Model::EMaterialType::Opaque);
 
-    pContext->SetPipelineState(m_depthOnlyCutoutPSO);
-    DrawObjects(pContext, Model::EMaterialType::Cutout);
+    //pContext->SetPipelineState(m_depthOnlyCutoutPSO);
+    //DrawObjects(pContext, Model::EMaterialType::Cutout);
 }
 
 void DepthOnlyPass::Dispose() {
@@ -77,7 +86,7 @@ void DepthOnlyPass::DrawObject(GraphicsContext* pContext, const Model* pModel, M
         materialIdx = subMesh.materialIndex;
         if (filter == Model::EMaterialType::Cutout) {
             auto handle = pModel->GetSRV(materialIdx, Model::ETextureType::Diffuse);
-            pContext->SetDynamicDescriptor(0, 0, handle);
+            pContext->SetDynamicDescriptor(2, 0, handle);
         }
 
         int indexCount = 0;

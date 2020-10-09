@@ -26,6 +26,8 @@ private:
     Model m_model;
     Camera m_mainCamera;
     ShadowCamera m_shadowCamera;
+    D3D12_VIEWPORT m_mainViewport;
+    D3D12_RECT m_mainScissor;
     std::unique_ptr<CameraController> m_cameraController;
     std::unique_ptr<DepthOnlyPass> m_depthOnlyPass;
 };
@@ -50,7 +52,8 @@ void Training::Startup() {
     float modelRadius = Length(m_model.m_Header.boundingBox.max - m_model.m_Header.boundingBox.min) * .5f;
     const Vector3 eye = (m_model.m_Header.boundingBox.min + m_model.m_Header.boundingBox.max) * .5f + Vector3(modelRadius * .5f, 0.0f, 0.0f);
     m_mainCamera.SetEyeAtUp(eye, Vector3(kZero), Vector3(kYUnitVector));
-    m_mainCamera.SetZRange(1.0f, 10000.0f);
+    m_mainCamera.SetZRange(0.1f, 10000.0f);
+    m_mainCamera.ReverseZ(true);
     m_cameraController.reset(new CameraController(m_mainCamera, Vector3(kYUnitVector)));
 
     m_depthOnlyPass.reset(new DepthOnlyPass());
@@ -64,15 +67,30 @@ void Training::Cleanup() {
 }
 
 void Training::Update(float deltaT) {
+    m_cameraController->Update(deltaT);
 
+    m_mainViewport.TopLeftX = 0;
+    m_mainViewport.TopLeftY = 0;
+    m_mainViewport.Width = (float)Graphics::g_SceneColorBuffer.GetWidth();
+    m_mainViewport.Height = (float)Graphics::g_SceneColorBuffer.GetHeight();
+    m_mainViewport.MinDepth = 0.0f;
+    m_mainViewport.MaxDepth = 1.0f;
+
+    m_mainScissor.left = 0;
+    m_mainScissor.top = 0;
+    m_mainScissor.right = (LONG)Graphics::g_SceneColorBuffer.GetWidth();
+    m_mainScissor.bottom = (LONG)Graphics::g_SceneColorBuffer.GetHeight();
 }
 
 void Training::RenderScene() {
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Render");
+    gfxContext.TransitionResource(Graphics::g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    gfxContext.TransitionResource(Graphics::g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    gfxContext.FlushResourceBarriers();
 
     gfxContext.ClearColor(Graphics::g_SceneColorBuffer);
     gfxContext.ClearDepthAndStencil(Graphics::g_SceneDepthBuffer);
-
+    gfxContext.SetViewportAndScissor(m_mainViewport, m_mainScissor);
     m_depthOnlyPass->Execute(m_mainCamera, &gfxContext);
 
     gfxContext.Finish();

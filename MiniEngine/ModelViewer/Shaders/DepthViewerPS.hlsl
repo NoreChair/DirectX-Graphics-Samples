@@ -22,9 +22,13 @@ struct VSOutput
 Texture2D<float4>    texDiffuse        : register(t0);
 SamplerState        sampler0        : register(s0);
 
-[RootSignature(ModelViewer_RootSig)]
-void main(VSOutput vsOutput)
-{
-    if (texDiffuse.Sample(sampler0, vsOutput.uv).a < 0.5)
-        discard;
+//[RootSignature(ModelViewer_RootSig)]
+//void main(VSOutput vsOutput)
+//{
+//    if (texDiffuse.Sample(sampler0, vsOutput.uv).a < 0.5)
+//        discard;
+//}
+
+float3 main(VSOutput vsOutput):SV_Target0 {
+    return float3(vsOutput.uv.x, vsOutput.uv.y, 0.0);
 }
